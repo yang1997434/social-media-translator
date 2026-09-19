@@ -52,10 +52,35 @@ async function classify(body, env, req) {
   return json({ answers: resp.answers, usage: resp.usage, model: resp.model, quota: { used: nowUsed, limit: perId } });
 }
 
+const PAGE_CSS = "body{font:16px/1.65 -apple-system,system-ui,sans-serif;max-width:720px;margin:48px auto;padding:0 20px;color:#0f1419}h1{font-size:28px}h2{font-size:19px;margin-top:32px}code{background:#f2f4f5;padding:1px 5px;border-radius:4px}a{color:#1d9bf0}li{margin:6px 0}.muted{color:#536471;font-size:14px}";
+const html = body => new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reply Filter for X</title><style>${PAGE_CSS}</style></head><body>${body}</body></html>`, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+
+const PRIVACY = `<h1>Privacy Policy — Reply Filter for X</h1><p class="muted">Last updated: 2026-09-19</p>
+<p>Reply Filter for X is a browser extension that collapses low-value replies on x.com post pages. This page explains exactly what data it handles.</p>
+<h2>What the extension sends</h2><ul>
+<li>The text and author handle of the post you are viewing, and the text and author handles of the replies being evaluated.</li>
+<li>Up to 10 "don't want to see" and 10 "keep" example replies that you explicitly marked.</li>
+<li>A random anonymous install ID generated on your device, used only for rate limiting.</li></ul>
+<p>It never reads or sends your X account, cookies, passwords, direct messages, browsing history, or any page other than x.com / twitter.com post pages.</p>
+<h2>Where it goes</h2><ul>
+<li><b>Free mode (default):</b> to this service (<code>xrf.ship2market.ai</code>, a Cloudflare Worker), which forwards it to OpenRouter's TypeSafe Jev decision model and returns the scores.</li>
+<li><b>Your own key mode:</b> directly from your browser to OpenRouter. This service is not involved.</li></ul>
+<h2>What this service stores</h2><ul>
+<li>Only counters: replies evaluated today per install ID, per hashed IP address, and total daily spend. They expire after 26 hours.</li>
+<li>It does <b>not</b> store post text, reply text, examples, or raw IP addresses.</li></ul>
+<h2>What stays on your device</h2><p>Your examples, cached verdicts, review queue, custom keywords, blocked handles and optional API key are stored in Chrome extension storage. You can delete them from the options page or by removing the extension.</p>
+<h2>Sharing and selling</h2><p>Data is not sold, not used for advertising, and not used for any purpose other than deciding which replies to collapse. Third-party processors: Cloudflare (hosting) and OpenRouter / TypeSafe (model inference).</p>
+<h2>Contact</h2><p>Open an issue at <a href="https://github.com/zhuyansen/x-reply-filter">github.com/zhuyansen/x-reply-filter</a> or email m17551076169@gmail.com.</p>`;
+
+const HOME = `<h1>Reply Filter for X</h1><p>Collapses spam, engagement bait, off-topic and AI-filler replies on x.com. Nothing is deleted: every hidden reply becomes a one-line bar you can expand. Mark replies yourself and the AI learns your taste.</p>
+<p><a href="/privacy">Privacy Policy</a> · <a href="https://github.com/zhuyansen/x-reply-filter">Source code (MIT)</a></p><p class="muted">This domain also hosts the free-tier API used by the extension.</p>`;
+
 export default {
   async fetch(req, env) {
     if (req.method === "OPTIONS") return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST" } });
     const url = new URL(req.url);
+    if (req.method === "GET" && url.pathname === "/privacy") return html(PRIVACY);
+    if (req.method === "GET" && url.pathname === "/") return html(HOME);
     if (req.method === "GET" && url.pathname === "/quota") {
       const id = url.searchParams.get("id") || "";
       if (!ID_RE.test(id)) return json({ error: "bad_install_id" }, 400);

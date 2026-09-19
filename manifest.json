@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "X Reply Filter (jev)",
-  "version": "0.5.0",
-  "description": "Collapse low-value replies on X/Twitter using local rules plus TypeSafe jev decisions via OpenRouter.",
+  "name": "Reply Filter for X",
+  "version": "0.5.1",
+  "description": "Collapse spam, engagement bait, off-topic and AI-filler replies on X. Nothing deleted, one click to expand. Learns what you hide.",
   "permissions": [
     "storage"
   ],
@@ -45,5 +45,5 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "homepage_url": "https://github.com/zhuyansen/x-reply-filter"
+  "homepage_url": "https://xrf.ship2market.ai/"
 }

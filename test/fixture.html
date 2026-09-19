@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"><title>xrf fixture</title><link rel="stylesheet" href="/content.css">
+<style>body{font:15px/1.4 -apple-system,system-ui,sans-serif;max-width:600px;margin:20px auto;background:#000;color:#e7e9ea}article{padding:12px 16px;border-bottom:1px solid #2f3336}article b{color:#fff}small{color:#71767b}</style></head>
+<body>
+<script>
+// Mock chrome API + canned jev verdicts, so the content script runs outside the extension.
+const CANNED = { "102": { cat: "slop", p: 0.91 }, "103": { cat: "spam", p: 0.97 }, "104": { cat: "offtopic", p: 0.88 }, "101": null, "105": null };
+const mem = {}; window.__mem = mem; window.__sync = { customKeywords: ['sourdough'], blockedHandles: [] };
+window.__xrfMsgs = [];
+window.chrome = {
+  storage: { local: { get: async keys => { const defaults = (keys && typeof keys === 'object' && !Array.isArray(keys)) ? keys : {}; const list = typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys);
+               return Object.fromEntries(list.filter(k => k in mem || k in defaults).map(k => [k, k in mem ? mem[k] : defaults[k]])); }, set: async o => Object.assign(mem, o) },
+             sync: { get: async d => ({ ...d, ...window.__sync }), set: async o => Object.assign(window.__sync, o) }, onChanged: { addListener() {} } },
+  runtime: { id: "fixture", getManifest: () => ({ version: "fixture" }), onMessage: { addListener: fn => { window.__xrfOnMessage = fn; } },
+    sendMessage: async msg => { window.__xrfMsgs.push(msg); if (msg.type !== "classify") return { ok: true };
+      window.__xrfLastMsg = msg; return { mode: "proxy", verdicts: msg.replies.map(r => CANNED[r.id] ?? null) }; } },
+};
+history.replaceState({}, "", "/thsottiaux/status/100" + location.search);
+</script>
+<div id="timeline">
+<article data-testid="tweet"><div data-testid="User-Name"><a href="/thsottiaux"><b>Tibo</b> <svg data-testid="icon-verified" width="12" height="12"><circle r="6" cx="6" cy="6" fill="#1d9bf0"/></svg></a></div><a href="/thsottiaux/status/100"><small>2h</small></a><div data-testid="tweetText">Update on rate limits in Codex. We found some inefficiencies when using images in long sessions and shipped fixes.</div></article>
+<article data-testid="tweet"><div data-testid="User-Name"><a href="/dev_amy"><b>Amy</b></a></div><a href="/dev_amy/status/101"><small>1h</small></a><div data-testid="tweetText">Does the compaction fix also apply to the CLI or only the desktop app?</div></article>
+<article data-testid="tweet"><div data-testid="User-Name"><a href="/growthguru"><b>Growth Guru</b></a></div><a href="/growthguru/status/102"><small>1h</small></a><div data-testid="tweetText">Great insights! Leveraging AI to unlock efficiency is truly the future of work. Thanks for sharing!</div></article>
+<article data-testid="tweet"><div data-testid="User-Name"><a href="/solanaqueen"><b>Solana Queen</b></a></div><a href="/solanaqueen/status/103"><small>1h</small></a><div data-testid="tweetText">While you're here, our AI trading bot made 40% this week, join the waitlist 👉</div></article>
+<article data-testid="tweet"><div data-testid="User-Name"><a href="/cheflara"><b>Lara</b></a></div><a href="/cheflara/status/104"><small>50m</small></a><div data-testid="tweetText">Anyone got a good sourdough starter recipe?</div></article>
+<article data-testid="tweet"><div data-testid="User-Name"><a href="/bot_user48213"><b>bot</b></a></div><a href="/bot_user48213/status/106"><small>40m</small></a><div data-testid="tweetText">so true</div></article>
+<article data-testid="tweet"><div data-testid="User-Name"><a href="/ben"><b>Ben</b></a></div><a href="/ben/status/105"><small>30m</small></a><div data-testid="tweetText">Honestly the image path was always the slow one, nice to see it fixed.</div></article>
+</div>
+<script src="/rules.js"></script><script src="/content.js"></script>
+<script>
+// ?invalidate=1 simulates the extension being reloaded while this tab stays open.
+if (location.search.includes('invalidate')) setTimeout(() => { delete chrome.runtime.id; const boom = () => { throw new Error('Extension context invalidated.'); };
+  chrome.storage.local.get = boom; chrome.storage.local.set = boom; chrome.runtime.sendMessage = boom; }, 1000);
+window.addEventListener('unhandledrejection', e => { (window.__unhandled ||= []).push(String(e.reason)); });
+window.addEventListener('error', e => { (window.__unhandled ||= []).push(String(e.message)); });
+// Simulate X's infinite scroll adding a reply later.
+setTimeout(() => { const a = document.createElement("article"); a.setAttribute("data-testid", "tweet");
+  a.innerHTML = '<div data-testid="User-Name"><a href="/late"><b>Late</b></a></div><a href="/late/status/107"><small>now</small></a><div data-testid="tweetText">$PEPE to the moon 🚀🚀</div>';
+  document.getElementById("timeline").appendChild(a); }, 1500);
+</script></body></html>

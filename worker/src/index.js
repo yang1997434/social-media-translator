@@ -70,10 +70,10 @@ const PRIVACY = `<h1>Privacy Policy — Reply Filter for X</h1><p class="muted">
 <li>It does <b>not</b> store post text, reply text, examples, or raw IP addresses.</li></ul>
 <h2>What stays on your device</h2><p>Your examples, cached verdicts, review queue, custom keywords, blocked handles and optional API key are stored in Chrome extension storage. You can delete them from the options page or by removing the extension.</p>
 <h2>Sharing and selling</h2><p>Data is not sold, not used for advertising, and not used for any purpose other than deciding which replies to collapse. Third-party processors: Cloudflare (hosting) and OpenRouter / TypeSafe (model inference).</p>
-<h2>Contact</h2><p>Email <a href="mailto:m17551076169@gmail.com">m17551076169@gmail.com</a>.</p>`;
+<h2>Contact</h2><p>Open an issue at <a href="https://github.com/zhuyansen/x-reply-filter/issues">github.com/zhuyansen/x-reply-filter</a> or email <a href="mailto:m17551076169@gmail.com">m17551076169@gmail.com</a>.</p>`;
 
 const HOME = `<h1>Reply Filter for X</h1><p>Collapses spam, engagement bait, off-topic and AI-filler replies on x.com. Nothing is deleted: every hidden reply becomes a one-line bar you can expand. Mark replies yourself and the AI learns your taste.</p>
-<p><a href="/privacy">Privacy Policy</a></p><p class="muted">This domain also hosts the free-tier API used by the extension.</p>`;
+<p><a href="/privacy">Privacy Policy</a> · <a href="https://github.com/zhuyansen/x-reply-filter">Source code (MIT)</a></p><p class="muted">This domain also hosts the free-tier API used by the extension.</p>`;
 
 export default {
   async fetch(req, env) {

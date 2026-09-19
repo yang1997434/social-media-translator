@@ -1,0 +1,43 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>Reply Filter for X · 上架填写助手</title><style>
+body{font:15px/1.6 -apple-system,system-ui,sans-serif;max-width:860px;margin:32px auto;padding:0 20px;color:#0f1419;background:#f7f9f9}h1{font-size:24px}section{background:#fff;border:1px solid #e1e8ed;border-radius:12px;padding:18px 20px;margin:16px 0}h2{font-size:17px;margin:0 0 4px}.hint{color:#536471;margin:0 0 12px}.f{margin:12px 0}.f label{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px;margin-bottom:4px}pre{white-space:pre-wrap;word-break:break-word;background:#f2f4f5;border-radius:8px;padding:10px 12px;margin:0;font:13px/1.55 ui-monospace,Menlo,monospace;max-height:220px;overflow:auto}button{border:0;border-radius:999px;background:#1d9bf0;color:#fff;font-weight:600;padding:4px 14px;cursor:pointer;font-size:12px}button.ok{background:#00ba7c}.meta{color:#536471;font-size:13px}
+</style></head><body><h1>Reply Filter for X · 上架填写助手</h1><p class="meta">后台地址：<a href="https://chrome.google.com/webstore/devconsole" target="_blank">chrome.google.com/webstore/devconsole</a> · 名称和简短说明来自 zip 里的 manifest，无需填写。简短说明：Collapse spam, engagement bait, off-topic and AI-filler replies on X. Nothing deleted, one click to expand. Learns what you hide.</p>
+<section><h2>第 1 步 · 上传</h2><p class="hint">点右上角 New item，上传这个文件</p>
+<div class="f"><label><span>zip 路径（文件选择框里按 Cmd+Shift+G 粘贴）</span><button>复制</button></label><pre>/Users/zhuyansen/content/x-reply-filter/dist/x-reply-filter-0.5.1.zip</pre></div>
+</section>
+<section><h2>第 2 步 · Store listing</h2><p class="hint">语言选 Chinese (Simplified)；Category 选 Social &amp; Communication；上传 3 张截图 + 1 张小宣传图（Finder 已打开素材文件夹）</p>
+<div class="f"><label><span>详细说明（中文）</span><button>复制</button></label><pre>刷 X 的评论区，总被推广、复读机和 AI 套话淹没？Reply Filter for X 自动把这些低价值回复折叠成一行灰条，真正有内容的讨论留在眼前。
+
+■ 折叠四类回复：推广/垃圾、互动饵（&quot;so true&quot;、纯 emoji）、跑题、AI 套话
+■ 不删除任何内容：每条被折叠的回复点一下即可展开，页面底部可一键全部展开
+■ 会学你的口味：悬停回复点「隐藏」，它就成为例子，AI 以后把同类也折叠；判错了点「误判」，该回复永不再折叠
+■ 自定义规则：关键词（支持正则）和屏蔽用户列表，本地生效
+■ 零配置：安装即用，每天 300 条免费 AI 判定额度；填自己的 OpenRouter key 可不限量
+■ 透明：点工具栏图标查看本页扫描数、隐藏数、今日额度和总开关
+
+工作方式：先用本地规则过滤明显的垃圾（零成本、不联网），其余回复交给 TypeSafe Jev 决策模型打分，超过阈值才折叠。
+
+隐私：只处理你正在看的推文页上的公开回复文本，不读取账号、Cookie、私信或浏览历史。详见隐私政策。</pre></div>
+<div class="f"><label><span>详细说明（English，想加第二语言时用）</span><button>复制</button></label><pre>Tired of promo, copy-paste reactions and AI filler burying the real discussion under X posts? Reply Filter for X collapses low-value replies into a one-line bar so the useful ones stand out.
+
+• Collapses four kinds of replies: spam/promo, engagement bait, off-topic, AI filler
+• Nothing is deleted: click any bar to expand, or expand all at once
+• Learns your taste: hover a reply and click Hide to make it an example; click &quot;wrong&quot; on a bar and that reply is never hidden again
+• Custom rules: keywords (regex supported) and blocked handles, applied locally
+• Zero setup: 300 free AI evaluations per day; add your own OpenRouter key for unlimited use
+
+Local rules run first (free, offline). Remaining replies are scored by the TypeSafe Jev decision model and collapsed only above a threshold.</pre></div>
+<div class="f"><label><span>Homepage URL</span><button>复制</button></label><pre>https://xrf.ship2market.ai/</pre></div>
+<div class="f"><label><span>Support URL（仓库建好后再填，否则留空）</span><button>复制</button></label><pre>https://github.com/zhuyansen/x-reply-filter/issues</pre></div>
+</section>
+<section><h2>第 3 步 · Privacy practices</h2><p class="hint">Remote code 选 No；数据类型只勾 Website content，其余都不勾；底部三条声明全勾</p>
+<div class="f"><label><span>Single purpose</span><button>复制</button></label><pre>Collapse low-value replies on X (x.com) post pages so users can focus on substantive discussion.</pre></div>
+<div class="f"><label><span>storage 权限理由</span><button>复制</button></label><pre>Saves the user&#x27;s settings (on/off, threshold, custom keywords, blocked handles, optional API key), the examples they marked, and cached verdicts so a reply is never evaluated twice.</pre></div>
+<div class="f"><label><span>Host 权限理由（一个输入框，整段粘贴）</span><button>复制</button></label><pre>x.com and twitter.com: the content script reads the public reply text on the post page the user is viewing and collapses low-value replies in place. xrf.ship2market.ai: the extension&#x27;s own free-tier API, which forwards reply text to the decision model and returns scores. openrouter.ai: used only when the user enters their own OpenRouter API key, to call the model directly from the browser.</pre></div>
+<div class="f"><label><span>Remote code 说明（若要求填写）</span><button>复制</button></label><pre>No remote code. All JavaScript is bundled in the package; the extension only sends JSON to an API and receives JSON scores.</pre></div>
+<div class="f"><label><span>Privacy policy URL</span><button>复制</button></label><pre>https://xrf.ship2market.ai/privacy</pre></div>
+</section>
+<section><h2>第 4 步 · Distribution</h2><p class="hint">Visibility: Public · Regions: All regions · Pricing: Free</p>
+</section>
+<section><h2>第 5 步 · 保存</h2><p class="hint">点 Save draft。先不要点 Submit for review，切到后台标签后回 Claude 一声，我帮你逐页核对。</p>
+</section>
+<script>document.querySelectorAll("button").forEach(b=>b.onclick=async()=>{await navigator.clipboard.writeText(b.closest(".f").querySelector("pre").textContent);b.textContent="已复制";b.classList.add("ok");setTimeout(()=>{b.textContent="复制";b.classList.remove("ok")},1500)});</script></body></html>

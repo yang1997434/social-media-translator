@@ -1,0 +1,15 @@
+/* In-place mode: the original children collapse to zero size (works for bare text nodes too), our copy takes their place
+   with the element's own computed font-size/line-height, so the page looks natively Chinese. */
+.xrf-replaced:not(.xrf-show-orig){font-size:0!important}
+.xrf-replaced:not(.xrf-show-orig)>:not(.xrf-tr):not(.xrf-tr-toggle){display:none!important}
+.xrf-replaced.xrf-show-orig>.xrf-tr{display:none!important}
+.xrf-tr{font:inherit;color:inherit;white-space:pre-wrap;overflow-wrap:anywhere}
+.xrf-tr>*{font-size:inherit}
+.xrf-tr-loading>:not(.xrf-tr):not(.xrf-tr-toggle){opacity:.55;transition:opacity .3s}
+.xrf-tr-toggle{display:none;margin-left:6px;padding:0 6px;border-radius:999px;font:11px/18px -apple-system,system-ui,sans-serif;color:#8b98a5;background:rgba(128,128,128,.14);cursor:pointer;user-select:none;vertical-align:middle;white-space:nowrap}
+.xrf-replaced:hover>.xrf-tr-toggle,.xrf-tr-err{display:inline-block}
+.xrf-tr-toggle:hover{color:#1d9bf0;background:rgba(29,155,240,.14)}
+.xrf-tr-err{color:#f4212e;font-size:12px}
+/* Bilingual mode: translation as a second line in a distinct tint. */
+.xrf-tr-below{display:block;margin-top:4px;font-size:calc(1em - 1px);color:#5b4fcf}
+html.xrf-dark .xrf-tr-below{color:#b3adf0}

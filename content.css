@@ -1,12 +1,14 @@
-.xrf-bar{display:flex;align-items:center;gap:8px;padding:6px 16px;font:13px/1.4 -apple-system,system-ui,sans-serif;color:#71767b;border-bottom:1px solid rgba(128,128,128,.25);cursor:pointer;user-select:none}
-.xrf-bar b{color:#8b98a5;font-weight:600}.xrf-bar .xrf-tag{padding:1px 7px;border-radius:999px;background:rgba(128,128,128,.18);font-size:11px}
-.xrf-bar:hover{background:rgba(128,128,128,.08)}
+/* Reply filter: collapsed bar, floating pill, hover "hide" button, toast. Tuned for both X themes. */
+.xrf-bar{display:flex;align-items:center;gap:8px;margin:4px 12px;padding:7px 12px;border-radius:12px;font:13px/1.4 -apple-system,system-ui,"PingFang SC",sans-serif;color:#71767b;background:rgba(128,128,128,.08);border:1px solid rgba(128,128,128,.14);cursor:pointer;user-select:none;transition:background .15s}
+.xrf-bar:hover{background:rgba(128,128,128,.15)}
+.xrf-bar b{color:#8b98a5;font-weight:600}
+.xrf-bar .xrf-tag{padding:1px 8px;border-radius:999px;background:rgba(29,155,240,.14);color:#1d9bf0;font-size:11px;font-weight:600}
 .xrf-hidden{display:none!important}
-.xrf-pill{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;display:none;align-items:center;gap:10px;padding:8px 14px;border-radius:999px;background:#1d9bf0;color:#fff;font:13px/1.3 -apple-system,system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.xrf-acts{margin-left:auto;display:flex;gap:12px}.xrf-acts a{color:#1d9bf0;cursor:pointer;font-weight:500}.xrf-acts a:hover{text-decoration:underline}
+.xrf-pill{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;display:none;align-items:center;gap:10px;padding:8px 16px;border-radius:999px;background:#1d9bf0;color:#fff;font:13px/1.3 -apple-system,system-ui,"PingFang SC",sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.35)}
 .xrf-pill b{font-weight:700}.xrf-pill a{cursor:pointer;text-decoration:underline;color:#fff}
 .xrf-host{position:relative}
-.xrf-mark{position:absolute;top:8px;right:88px;z-index:2;display:none;padding:2px 10px;border-radius:999px;border:1px solid rgba(128,128,128,.5);background:rgba(0,0,0,.55);color:#e7e9ea;font:12px/1.5 -apple-system,system-ui,sans-serif;cursor:pointer}
+.xrf-mark{position:absolute;top:8px;right:88px;z-index:2;display:none;padding:3px 11px;border-radius:999px;border:1px solid rgba(128,128,128,.4);background:rgba(15,20,25,.75);backdrop-filter:blur(6px);color:#e7e9ea;font:12px/1.5 -apple-system,system-ui,"PingFang SC",sans-serif;cursor:pointer}
 .xrf-host:hover .xrf-mark{display:block}.xrf-mark:hover{background:#f4212e;border-color:#f4212e;color:#fff}
-.xrf-acts{margin-left:auto;display:flex;gap:12px}.xrf-acts a{color:#1d9bf0;cursor:pointer}.xrf-acts a:hover{text-decoration:underline}
-.xrf-toast{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:10000;display:flex;gap:12px;align-items:center;padding:10px 16px;border-radius:12px;background:#0f1419;color:#fff;border:1px solid #2f3336;font:13px/1.4 -apple-system,system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+.xrf-toast{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:10000;display:flex;gap:12px;align-items:center;padding:10px 16px;border-radius:12px;background:#0f1419;color:#fff;border:1px solid #2f3336;font:13px/1.4 -apple-system,system-ui,"PingFang SC",sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.45)}
 .xrf-toast a{color:#1d9bf0;cursor:pointer;white-space:nowrap}.xrf-toast a:hover{text-decoration:underline}

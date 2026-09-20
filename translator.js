@@ -274,19 +274,31 @@
     scanTimer = setTimeout(() => { scanTimer = null; scan(); }, 200);
   };
 
-  // Sites pick their own theme independent of the OS: light body text means a dark page.
-  function detectTheme() {
+  // Sites pick their own theme independent of the OS. The page's own background decides (body, then html); a page that
+  // paints neither is on the browser's white canvas, so it is light (judging by text colour misfired on grey-text sites
+  // like HN). Re-checked when the site flips its theme (class / data-theme on html or body) or the OS scheme changes,
+  // so the side tab and bilingual tint follow.
+  const luminance = c => { const m = String(c || "").match(/[\d.]+/g); if (!m || m.length < 3) return null; if (m.length >= 4 && Number(m[3]) === 0) return null; return (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) / 255; };
+  function pageIsDark() {
     try {
-      const [r, g, b] = getComputedStyle(document.body).color.match(/\d+/g).map(Number);
-      document.documentElement.classList.toggle("xrf-dark", (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5);
-    } catch { /* keep light default */ }
+      for (const el of [document.body, document.documentElement]) { const l = el && luminance(getComputedStyle(el).backgroundColor); if (l != null) return l < 0.45; }
+      return false;
+    } catch { return false; }
+  }
+  function detectTheme() { document.documentElement.classList.toggle("xrf-dark", pageIsDark()); }
+  let themeWatch = null;
+  function watchTheme() {
+    if (themeWatch) return;
+    themeWatch = new MutationObserver(detectTheme);
+    for (const el of [document.documentElement, document.body]) if (el) themeWatch.observe(el, { attributes: true, attributeFilter: ["class", "style", "data-theme", "data-color-mode", "data-mode"] });
+    matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", detectTheme);
   }
 
   function start() {
     if (enabled || !alive()) return;
     enabled = true;
     stats.translated = 0; stats.failed = 0; stats.lastError = "";
-    detectTheme();
+    detectTheme(); watchTheme();
     io = new IntersectionObserver(onIntersect, { rootMargin: "600px 0px" });   // ~two tweets ahead: translated before they scroll in
     mo = new MutationObserver(onMutations);
     mo.observe(document.documentElement, { childList: true, characterData: true, subtree: true });
@@ -318,7 +330,7 @@
     fab.innerHTML = `<img alt="" src="${chrome.runtime.getURL("icons/logo.svg")}"><span class="xrf-fab-label"></span>`;
     fab.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); togglePage(); });
     (document.body || document.documentElement).appendChild(fab);
-    detectTheme(); updateFab();
+    detectTheme(); watchTheme(); updateFab();
   }
   function updateFab() {
     if (!fab) return;

@@ -11,7 +11,10 @@ function showResult(ok, html, id = "tr_result") { const r = $(id); r.className =
 
 // ---------------- translation ----------------
 let PROVIDERS = {};   // from the worker (trDefaults): host, default model, thinking switch, list prices
-const P = () => PROVIDERS[tr.provider] || Object.values(PROVIDERS)[0];
+// A stale worker (files updated on disk, extension not yet reloaded) answers without a provider table: render an
+// inert page with a hint instead of throwing on the first field.
+const STALE = { name: "", baseUrl: "", model: "", thinking: "", keyHint: "请先在 chrome://extensions 重新加载扩展", keyUrl: "#", prices: {} };
+const P = () => PROVIDERS[tr.provider] || Object.values(PROVIDERS)[0] || STALE;
 const curModel = () => tr.models?.[tr.provider] || P().model;
 async function saveTr(patch) {
   const { tr: cur } = await chrome.storage.sync.get({ tr: {} });   // popup may have flipped the switch meanwhile
@@ -129,11 +132,12 @@ async function renderFFoot() {
 
 // ---------------- init ----------------
 async function init() {
-  const { defaults, providers } = await chrome.runtime.sendMessage({ type: "trDefaults" });
+  const { defaults = {}, providers } = await chrome.runtime.sendMessage({ type: "trDefaults" }).catch(() => ({})) || {};
   PROVIDERS = providers || {};
+  if (!providers) showResult(false, "扩展后台还是旧版本：请到 chrome://extensions 点「重新加载」，再打开设置页");
   const { tr: saved } = await chrome.storage.sync.get({ tr: {} });
   tr = { ...defaults, ...saved, sites: { ...defaults.sites, ...(saved.sites || {}) }, keys: { ...(saved.keys || {}) }, models: { ...(saved.models || {}) } };
-  if (!PROVIDERS[tr.provider]) tr.provider = defaults.provider;
+  if (!PROVIDERS[tr.provider]) tr.provider = defaults.provider || "siliconflow";
   renderTr(); bindTr(); renderTrFoot(); loadModels();
   await renderF(); bindF(); renderFFoot();
   // Live updates: marking a reply on x.com or a translation finishing shows up here without reloading.

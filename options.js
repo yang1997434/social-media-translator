@@ -47,26 +47,39 @@ async function testTr() {
 function bindTr() {
   $("tr_enabled").onchange = e => saveTr({ enabled: e.target.checked });
   $("tr_apiKey").oninput = debounce(() => { saveTr({ apiKey: $("tr_apiKey").value.trim() }); loadModels(); }, 500);
-  $("tr_model").onchange = () => saveTr({ model: $("tr_model").value.trim() });
-  $("tr_model").oninput = debounce(() => saveTr({ model: $("tr_model").value.trim() }), 600);
+  const saveModel = async () => { const m = $("tr_model").value.trim(); await saveTr({ model: m }); applyKnownPrice(m); };
+  $("tr_model").onchange = saveModel;
+  $("tr_model").oninput = debounce(saveModel, 600);
+  $("tr_priceToggle").onclick = () => { $("tr_priceRow").hidden = !$("tr_priceRow").hidden; };
+  for (const k of ["priceIn", "priceOut"]) $("tr_" + k).onchange = e => saveTr({ [k]: Math.max(0, Number(e.target.value) || 0) }).then(renderTrFoot);
   $("tr_test").onclick = testTr;
   $("tr_mode").querySelectorAll("button").forEach(b => b.onclick = () => { saveTr({ mode: b.dataset.v }); $("tr_mode").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); });
   for (const s of ["x", "reddit"]) $("tr_site_" + s).onchange = e => { setChip(e.target); saveTr({ sites: { [s]: e.target.checked } }); };
 }
 
+// SiliconFlow list prices, ¥ per million tokens (siliconflow.cn/pricing, 2026-09). Other models: type them in.
+const PRICES = { "Qwen/Qwen3.5-35B-A3B": [0.4, 3.2], "Qwen/Qwen3.6-35B-A3B": [1.8, 10.8] };
+const price = () => ({ pin: Number(tr.priceIn) || 0, pout: Number(tr.priceOut) || 0 });
+const cost = b => { const { pin, pout } = price(); return (b.in * pin + b.out * pout) / 1e6; };
+
 async function renderTrFoot() {
   const { tstats } = await chrome.storage.local.get({ tstats: { day: "", today: { n: 0, in: 0, out: 0 }, total: { n: 0, in: 0, out: 0 } } });
   const t = tstats.day === new Date().toISOString().slice(0, 10) ? tstats.today : { n: 0, in: 0, out: 0 };
   const tot = tstats.total || { n: 0, in: 0, out: 0 };
-  $("tr_foot").textContent = `今日翻译 ${fmt(t.n)} 段 · ${fmt(t.in + t.out)} tokens　累计 ${fmt(tot.n)} 段 · ${fmt(tot.in + tot.out)} tokens`;
+  const { pin, pout } = price();
+  const line = (k, b) => `${k} ${fmt(b.n)} 段 · ${fmt(b.in + b.out)} tokens${pin || pout ? ` · ¥${cost(b).toFixed(3)}` : ""}`;
+  $("tr_foot").textContent = `${line("今日", t)}　${line("累计", tot)}`;
+  $("tr_priceIn").value = pin || ""; $("tr_priceOut").value = pout || "";
 }
+// Known model → fill its list price; unknown → keep whatever the user typed.
+function applyKnownPrice(model) { const p = PRICES[model]; if (p) return saveTr({ priceIn: p[0], priceOut: p[1] }).then(renderTrFoot); }
 
 // ---------------- filter ----------------
 async function saveF(patch) { await chrome.storage.sync.set(patch); toast(); }
 
 async function renderF() {
-  const s = await chrome.storage.sync.get({ enabled: true, threshold: 0.75, categories: {}, blockedHandles: [] });
-  $("f_enabled").checked = s.enabled !== false;
+  const s = await chrome.storage.sync.get({ enabled: true, apiKey: "", threshold: 0.75, categories: {}, blockedHandles: [] });
+  $("f_enabled").checked = s.enabled !== false; $("f_apiKey").value = s.apiKey;
   $("f_threshold").value = s.threshold; $("f_thresholdOut").value = s.threshold.toFixed(2);
   CATS.forEach(c => { const cb = $("c_" + c); cb.checked = s.categories[c] !== false; setChip(cb); });
   const box = $("f_blocked"); box.textContent = "";
@@ -80,47 +93,16 @@ async function renderF() {
 }
 function bindF() {
   $("f_enabled").onchange = e => saveF({ enabled: e.target.checked });
+  $("f_apiKey").oninput = debounce(() => saveF({ apiKey: $("f_apiKey").value.trim() }).then(renderFFoot), 500);
   $("f_threshold").oninput = e => { $("f_thresholdOut").value = Number(e.target.value).toFixed(2); };
   $("f_threshold").onchange = e => saveF({ threshold: Number(e.target.value) });
   CATS.forEach(c => $("c_" + c).onchange = async e => { setChip(e.target);
     const { categories } = await chrome.storage.sync.get({ categories: {} }); saveF({ categories: { ...categories, [c]: e.target.checked } }); });
 }
 async function renderFFoot() {
-  const { stats, quota } = await chrome.storage.local.get({ stats: { calls: 0, replies: 0 }, quota: null });
-  $("f_foot").textContent = `已判定 ${fmt(stats.replies)} 条回复　免费额度${quota ? ` 今日 ${quota.used} / ${quota.limit}` : " 每天 300 条"}`;
-}
-
-// ---------------- learning: review queue + examples ----------------
-function row(tagText, tagCls, text, acts) {
-  const r = document.createElement("div"); r.className = "list-row";
-  const tag = document.createElement("span"); tag.className = "tag " + tagCls; tag.textContent = tagText;
-  const t = document.createElement("span"); t.className = "txt"; t.textContent = text;
-  const a = document.createElement("span"); a.className = "acts";
-  acts.forEach(([label, color, fn]) => { const x = document.createElement("a"); x.textContent = label; x.style.color = color; x.onclick = fn; a.appendChild(x); });
-  r.append(tag, t, a); return r;
-}
-
-async function confirmRecent(r, kind) {
-  const { examples, recent } = await chrome.storage.local.get({ examples: { bad: [], good: [] }, recent: [] });
-  const other = kind === "bad" ? "good" : "bad";
-  examples[other] = examples[other].filter(e => e.id !== r.id);
-  examples[kind] = [...examples[kind].filter(e => e.id !== r.id), { id: r.id, t: r.t, h: r.h, ts: Date.now() }].slice(-30);
-  await chrome.storage.local.set({ examples, recent: recent.filter(x => x.id !== r.id), ["v:" + r.id]: kind === "bad" ? { cat: "user", p: 1 } : null, ["keep:" + r.id]: kind === "good" });
-}
-
-async function renderLearn() {
-  const { examples, recent } = await chrome.storage.local.get({ examples: { bad: [], good: [] }, recent: [] });
-  const all = [...examples.bad.map(e => ["bad", e]), ...examples.good.map(e => ["good", e])].sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
-  $("learn").hidden = !recent.length && !all.length;
-  $("recentWrap").hidden = !recent.length; $("examplesWrap").hidden = !all.length;
-  const rb = $("recent"); rb.textContent = "";
-  [...recent].reverse().forEach(r => rb.appendChild(row(r.reason + (r.p ? ` ${Math.round(r.p * 100)}%` : ""), "", `@${r.h}: ${r.t}`,
-    [["对，不想看", "var(--bad)", () => confirmRecent(r, "bad")], ["判错了，保留", "var(--ok)", () => confirmRecent(r, "good")]])));
-  const eb = $("examples"); eb.textContent = "";
-  all.forEach(([k, e]) => eb.appendChild(row(k === "bad" ? "不想看" : "想保留", k === "bad" ? "bad" : "ok", `@${e.h}: ${e.t}`, [["删除", "var(--muted)", async () => {
-    const { examples } = await chrome.storage.local.get({ examples: { bad: [], good: [] } });
-    examples[k] = examples[k].filter(x => x.id !== e.id);
-    await chrome.storage.local.set({ examples, ["v:" + e.id]: null, ["keep:" + e.id]: false }); }]])));
+  const { stats, quota } = await chrome.storage.local.get({ stats: { calls: 0, replies: 0, input_tokens: 0, output_tokens: 0, cost: 0 }, quota: null });
+  const { apiKey } = await chrome.storage.sync.get({ apiKey: "" });
+  $("f_foot").textContent = `已判定 ${fmt(stats.replies)} 条 · ${fmt(stats.input_tokens + stats.output_tokens)} tokens · $${stats.cost.toFixed(4)}　${apiKey ? "自带 key · 不限量" : `免费额度${quota ? ` 今日 ${quota.used} / ${quota.limit}` : " 每天 300 条"}`}`;
 }
 
 // ---------------- init ----------------
@@ -128,12 +110,12 @@ async function init() {
   const { defaults } = await chrome.runtime.sendMessage({ type: "trDefaults" });
   const { tr: saved } = await chrome.storage.sync.get({ tr: {} });
   tr = { ...defaults, ...saved, baseUrl: defaults.baseUrl, sites: { ...defaults.sites, ...(saved.sites || {}) } };
+  if (tr.priceIn == null && PRICES[tr.model]) [tr.priceIn, tr.priceOut] = PRICES[tr.model];
   renderTr(); bindTr(); renderTrFoot(); loadModels();
   await renderF(); bindF(); renderFFoot();
-  renderLearn();
   // Live updates: marking a reply on x.com or a translation finishing shows up here without reloading.
   chrome.storage.onChanged.addListener((ch, area) => {
-    if (area === "local") { if (ch.examples || ch.recent) renderLearn(); if (ch.stats || ch.quota) renderFFoot(); if (ch.tstats) renderTrFoot(); }
+    if (area === "local") { if (ch.stats || ch.quota) renderFFoot(); if (ch.tstats) renderTrFoot(); }
     if (area === "sync" && ch.blockedHandles) renderF();
   });
 }

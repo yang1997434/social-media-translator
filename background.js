@@ -9,7 +9,7 @@ const DEFAULTS = { apiKey: "", threshold: 0.75, proxyUrl: "https://xrf.ship2mark
 const EMPTY_STATS = { calls: 0, replies: 0, input_tokens: 0, output_tokens: 0, cost: 0 };
 
 const TR_DEFAULTS = { enabled: true, baseUrl: "https://api.siliconflow.cn/v1", apiKey: "", model: "Qwen/Qwen3.5-35B-A3B",
-  mode: "replace", sites: { x: true, reddit: true }, concurrency: 3, batch: 6 };
+  mode: "replace", sites: { x: true, reddit: true }, concurrency: 3, batch: 6, priceIn: null, priceOut: null };
 const TR_CACHE_MAX = 2000;
 const TR_EMPTY_STATS = { day: "", today: { n: 0, in: 0, out: 0 }, total: { n: 0, in: 0, out: 0 } };
 

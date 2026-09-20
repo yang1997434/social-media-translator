@@ -12,7 +12,7 @@
       remove: async k => { (Array.isArray(k) ? k : [k]).forEach(x => delete mem[x]); } };
   };
   const sync = store("sync"), local = store("local");
-  const DEFAULTS = { enabled: true, baseUrl: "https://api.siliconflow.cn/v1", apiKey: "", model: "Qwen/Qwen3.5-35B-A3B", mode: "replace", sites: { x: true, reddit: true }, concurrency: 3, batch: 6 };
+  const DEFAULTS = { enabled: true, baseUrl: "https://api.siliconflow.cn/v1", apiKey: "", model: "Qwen/Qwen3.5-35B-A3B", mode: "replace", sites: { x: true, reddit: true }, concurrency: 3, batch: 6, priceIn: null, priceOut: null };
   if (qs.get("configured") !== "0") sync.mem.tr = { apiKey: "sk-mock", mode: qs.get("mode") || "replace" };
   local.mem.recent = [{ id: "201", t: "Great insights! Leveraging AI to unlock efficiency is truly the future of work.", h: "growthguru", reason: "AI 套话", p: 0.91, ts: 1 },
     { id: "202", t: "Honest question: does the fix apply to the CLI too?", h: "dev_amy", reason: "跑题", p: 0.76, ts: 2 }];

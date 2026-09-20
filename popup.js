@@ -42,9 +42,8 @@ async function renderFilter(tab) {
   if (!s) { body.innerHTML = `<div class="line">刷新此页面后生效（插件刚安装或刚更新）</div>`; return; }
   const n = s.byRule + s.byJev;
   body.innerHTML = `<div class="big num">${n} <span style="font-size:13px;font-weight:500">条已隐藏</span></div><div class="line">扫描 ${s.scanned} · 规则 ${s.byRule} · AI ${s.byJev}${s.pending ? ` · 判定中 ${s.pending}` : ""}${s.note ? ` · <span style="color:var(--warn)">${esc(s.note)}</span>` : ""}</div>
-    <div class="cta"><button class="ghost sm" id="expand" ${n ? "" : "disabled"}>全部展开</button><a class="small" id="learn">教它你的口味 ›</a></div>`;
+    <div class="cta"><button class="ghost sm" id="expand" ${n ? "" : "disabled"}>全部展开</button></div>`;
   $("expand").onclick = async () => { await ask(tab, { type: "expandAll" }); renderFilter(tab); };
-  $("learn").onclick = openOptions;
 }
 
 async function init() {

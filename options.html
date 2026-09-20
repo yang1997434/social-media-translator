@@ -8,7 +8,7 @@ h2{font-size:15px;margin:0}
 .foot{margin-top:14px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
 .result{margin:10px 0 0 76px;padding:6px 10px}
 .chip .x{margin-left:2px;opacity:.6}.chip:hover .x{opacity:1}
-.sub-h{margin-top:14px;font-size:12px;font-weight:600;color:var(--muted)}
+.row.price{margin-top:8px}.row.price input{width:90px;flex:none}
 </style></head><body><div class="wrap">
 
 <div class="hero"><div class="ico f" style="width:40px;height:40px;border-radius:11px;font-size:18px">X</div><div><h1>X 助手</h1><div class="sub">改动即时保存</div></div></div>
@@ -21,7 +21,8 @@ h2{font-size:15px;margin:0}
   <div class="row"><label>显示</label><div class="ctl"><div class="seg" id="tr_mode"><button data-v="replace">原地替换</button><button data-v="bilingual">双语对照</button></div></div></div>
   <div class="row"><label>站点</label><div class="ctl chips"><label class="chip"><input type="checkbox" id="tr_site_x">X</label><label class="chip"><input type="checkbox" id="tr_site_reddit">Reddit</label></div></div>
   <div class="result" id="tr_result"></div>
-  <div class="foot" id="tr_foot"></div>
+  <div class="foot"><span id="tr_foot"></span> <a id="tr_priceToggle" class="small">单价</a>
+    <div class="row price" id="tr_priceRow" hidden><label>¥ / 百万</label><div class="ctl"><input type="number" id="tr_priceIn" min="0" step="0.1" placeholder="输入"><input type="number" id="tr_priceOut" min="0" step="0.1" placeholder="输出"></div></div></div>
 </section>
 
 <section class="card" id="filter">
@@ -29,15 +30,11 @@ h2{font-size:15px;margin:0}
     <label class="switch"><input type="checkbox" id="f_enabled"><span></span></label></div>
   <div class="row"><label>折叠</label><div class="ctl chips"><label class="chip"><input type="checkbox" id="c_spam">推广 / 垃圾</label><label class="chip"><input type="checkbox" id="c_bait">互动饵</label><label class="chip"><input type="checkbox" id="c_offtopic">跑题</label><label class="chip"><input type="checkbox" id="c_slop">AI 套话</label></div></div>
   <div class="row"><label>阈值</label><div class="ctl"><div class="range-row"><input type="range" id="f_threshold" min="0.5" max="0.95" step="0.05"><output id="f_thresholdOut"></output></div></div></div>
+  <div class="row"><label>jev Key</label><div class="ctl"><input type="password" id="f_apiKey" placeholder="可选：OpenRouter key，不填用免费额度" autocomplete="off"></div></div>
   <div class="row" id="f_blockedRow" hidden><label>已屏蔽</label><div class="ctl chips" id="f_blocked"></div></div>
   <div class="foot" id="f_foot"></div>
 </section>
 
-<section class="card" id="learn" hidden>
-  <div class="card-head"><span class="ico learn">学</span><div class="grow"><h2>教 AI 你的口味</h2><div class="muted small">确认过的回复会成为 AI 判断新回复的参考</div></div></div>
-  <div id="recentWrap"><div class="sub-h">最近自动隐藏 · 待确认</div><div class="list" id="recent"></div></div>
-  <div id="examplesWrap"><div class="sub-h">已记住的例子</div><div class="list" id="examples"></div></div>
-</section>
 
 </div>
 <div class="toast" id="toast">已保存</div>

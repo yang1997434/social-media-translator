@@ -109,8 +109,7 @@
     document.querySelector(".xrf-toast")?.remove();
     const el = document.createElement("div");
     el.className = "xrf-toast";
-    el.innerHTML = `<span>已记为「${kind === "bad" ? "不想看" : "想保留"}」的例子 · 不想看 ${examples.bad.length} 条 · 想保留 ${examples.good.length} 条</span><a>查看全部例子</a>`;
-    el.querySelector("a").addEventListener("click", () => chrome.runtime.sendMessage({ type: "openOptions" }).catch(() => {}));
+    el.innerHTML = `<span>已记为「${kind === "bad" ? "不想看" : "想保留"}」的例子 · 不想看 ${examples.bad.length} 条 · 想保留 ${examples.good.length} 条</span>`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 6000);
   }

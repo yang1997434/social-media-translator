@@ -6,7 +6,7 @@
 const JEV_TYPESAFE = { endpoint: "https://api.typesafe.ai/v1/systemone", model: "jev-latest" };
 const JEV_OPENROUTER = { endpoint: "https://openrouter.ai/api/alpha/decisions", model: "~typesafe/jev-latest" };
 const QUESTION_DEFS = {
-  spam: ["Is this reply promotional spam, a scam, or shilling a product/crypto/AI tool?", "Promo, scam, shill or link-farming", "Genuine comment"],
+  spam: ["Is this reply promotional spam, a scam, sexual solicitation, or shilling a product/crypto/AI tool? Consider the display name and reply together, including Chinese solicitation such as 同城上门 / 线下选妃. Do not flag genuine discussion or warnings merely quoting these phrases.", "Promo, sexual solicitation, scam, shill or link-farming", "Genuine comment"],
   bait: ["Is this reply low-effort engagement bait (generic agreement, emoji-only, 'first', copy-paste reaction)?", "Low-effort bait", "Substantive reply"],
   offtopic: ["Is this reply unrelated to the original tweet's topic?", "Clearly off-topic", "On topic"],
   slop: ["Does this reply read like generic AI-generated filler with no specific point?", "Generic AI filler", "Specific, human-sounding"],
@@ -29,7 +29,7 @@ function buildState(original, replies, examples) {
   if (ex.bad.length) { lines.push("USER-LABELED EXAMPLES (from other threads) the user marked LOW-VALUE:"); ex.bad.forEach(e => lines.push(`- ${e.t}`)); lines.push(""); }
   if (ex.good.length) { lines.push("USER-LABELED EXAMPLES the user marked KEEP (do not hide replies like these):"); ex.good.forEach(e => lines.push(`- ${e.t}`)); lines.push(""); }
   lines.push("REPLIES:");
-  replies.forEach((r, i) => lines.push(`[${i}] @${r.handle}${r.verified ? " (verified)" : ""}: ${String(r.text).slice(0, MAX_TEXT)}`));
+  replies.forEach((r, i) => lines.push(`[${i}] @${r.handle}${r.displayName ? ` display name=${JSON.stringify(String(r.displayName).slice(0, 100))}` : ""}${r.verified ? " (verified)" : ""}: ${String(r.text).slice(0, MAX_TEXT)}`));
   return lines.join("\n");
 }
 

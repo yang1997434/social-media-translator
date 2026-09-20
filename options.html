@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>X 助手 · 设置</title><link rel="stylesheet" href="ui.css">
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>Social Media Translator · 设置</title><link rel="stylesheet" href="ui.css">
 <style>
 body{padding:32px 16px 60px}.wrap{max-width:560px;margin:0 auto}
 .hero{display:flex;align-items:center;gap:12px;margin-bottom:16px}.hero h1{font-size:20px;margin:0;line-height:1.2}.hero .sub{color:var(--muted);font-size:12px}
@@ -11,12 +11,13 @@ h2{font-size:15px;margin:0}
 .row.price{margin-top:8px}.row.price input{width:90px;flex:none}
 </style></head><body><div class="wrap">
 
-<div class="hero"><div class="ico f" style="width:40px;height:40px;border-radius:11px;font-size:18px">X</div><div><h1>X 助手</h1><div class="sub">改动即时保存</div></div></div>
+<div class="hero"><img src="icons/logo.svg" width="40" height="40" alt="" style="flex-shrink:0"><div><h1>Social Media Translator</h1><div class="sub">改动即时保存</div></div></div>
 
 <section class="card" id="translate">
   <div class="card-head"><span class="ico tr">译</span><div class="grow"><h2>自动翻译</h2><div class="muted small">X / Reddit 上的外文原地变成中文</div></div>
     <label class="switch tr"><input type="checkbox" id="tr_enabled"><span></span></label></div>
-  <div class="row"><label>API Key</label><div class="ctl"><input type="password" id="tr_apiKey" placeholder="粘贴硅基流动 API Key" autocomplete="off"><button class="tr sm" id="tr_test" type="button">测试</button></div></div>
+  <div class="row"><label>服务商</label><div class="ctl"><div class="seg" id="tr_provider"><button data-v="siliconflow">硅基流动</button><button data-v="cerebras">Cerebras</button><button data-v="openrouter">OpenRouter</button></div><a id="tr_keyUrl" class="small" target="_blank" rel="noopener">获取 Key ↗</a></div></div>
+  <div class="row"><label>API Key</label><div class="ctl"><input type="password" id="tr_apiKey" placeholder="粘贴 API Key" autocomplete="off"><button class="tr sm" id="tr_test" type="button">测试</button></div></div>
   <div class="row"><label>模型</label><div class="ctl"><input type="text" id="tr_model" list="tr_models" autocomplete="off"><datalist id="tr_models"></datalist></div></div>
   <div class="row"><label>显示</label><div class="ctl"><div class="seg" id="tr_mode"><button data-v="replace">原地替换</button><button data-v="bilingual">双语对照</button></div></div></div>
   <div class="row"><label>站点</label><div class="ctl chips"><label class="chip"><input type="checkbox" id="tr_site_x">X</label><label class="chip"><input type="checkbox" id="tr_site_reddit">Reddit</label></div></div>

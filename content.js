@@ -20,6 +20,7 @@
   let observer = null;
   let routeTimer = null;
   let dead = false;
+  let filterGeneration = 0;
 
   // After the extension is reloaded/updated, this already-injected script loses its connection to the extension
   // ("Extension context invalidated"). Detect that and unload quietly instead of throwing on every chrome.* call.
@@ -38,7 +39,11 @@
   };
 
   const q = (el, sel) => el.querySelector(sel);
-  const text = el => (q(el, '[data-testid="tweetText"]')?.innerText || "").slice(0, MAX_TEXT);
+  const text = el => {
+    const node = q(el, '[data-testid="tweetText"]')?.cloneNode(true);
+    node?.querySelectorAll(".xrf-tr, .xrf-tr-toggle").forEach(n => n.remove());
+    return (node?.textContent || "").slice(0, MAX_TEXT);
+  };
   const handle = el => (q(el, '[data-testid="User-Name"] a[href^="/"]')?.getAttribute("href") || "").replace("/", "");
   const tweetId = el => (q(el, 'a[href*="/status/"]')?.getAttribute("href") || "").split("/status/")[1]?.split(/[/?]/)[0] || "";
   const isReplyPage = () => /\/status\/\d+/.test(location.pathname);
@@ -46,12 +51,14 @@
 
   function extract(article) {
     return { id: tweetId(article), text: text(article), handle: handle(article),
+      displayName: (q(article, '[data-testid="User-Name"] a[href^="/"]')?.textContent || "").trim().slice(0, 100),
       verified: !!q(article, 'svg[data-testid="icon-verified"]'), hasLink: !!q(article, 'a[href^="http"], a[href*="t.co/"]') };
   }
 
   function originalTweet() {
-    const first = document.querySelector('article[data-testid="tweet"]');
-    return first ? extract(first) : { handle: "", text: "" };
+    const id = location.pathname.match(/\/status\/(\d+)/)?.[1];
+    const original = [...document.querySelectorAll('article[data-testid="tweet"]')].find(el => tweetId(el) === id);
+    return original ? extract(original) : { handle: "", text: "" };
   }
 
   function report() {
@@ -63,7 +70,7 @@
   function renderPill() {
     if (!pill) { pill = document.createElement("div"); pill.className = "xrf-pill"; document.body.appendChild(pill); }
     const n = document.querySelectorAll("article.xrf-hidden").length;
-    pill.style.display = enabled && isReplyPage() && (n > 0 || stats.pending > 0) ? "flex" : "none";
+    pill.style.display = enabled && (n > 0 || stats.pending > 0) ? "flex" : "none";
     pill.innerHTML = `<b>Reply Filter</b><span>已隐藏 ${n} 条${stats.pending ? ` · 判定中 ${stats.pending}` : ""}</span>${n ? '<a data-xrf-expand>全部展开</a>' : ""}`;
     pill.querySelector("[data-xrf-expand]")?.addEventListener("click", expandAll);
   }
@@ -157,8 +164,9 @@
     return Object.fromEntries(ids.map(i => [i, got["v:" + i]]));
   }
 
-  async function classifyBatch(fresh) {
+  async function classifyBatch(fresh, generation, path) {
     const res = await chrome.runtime.sendMessage({ type: "classify", original: originalTweet(), replies: fresh.map(b => b.data) });
+    if (!enabled || generation !== filterGeneration || path !== location.pathname) return;
     if (!res || res.error) {
       stats.note = res?.error === "quota" ? "今日免费额度已用完，仅规则过滤" : "jev 暂不可用，仅规则过滤";
       console[res?.error === "quota" ? "info" : "warn"]("[xrf]", stats.note, res?.error || "");
@@ -172,11 +180,15 @@
   }
 
   const flush = guard(async function flushImpl() {
+    const generation = filterGeneration, path = location.pathname;
+    if (!enabled || !isReplyPage()) return;
     const batch = pending.splice(0, BATCH_SIZE);
     if (!batch.length) return;
     const cache = await cached(batch.map(b => b.data.id));
+    if (!enabled || generation !== filterGeneration || path !== location.pathname) return;
     const fresh = batch.filter(b => { const v = cache[b.data.id]; if (v === undefined) return true; if (v) collapse(b.el, REASON_LABEL[v.cat] || "你标记的", v.p, b.data); return false; });
-    if (fresh.length) await classifyBatch(fresh).catch(e => console.warn("[xrf]", e));
+    if (fresh.length) await classifyBatch(fresh, generation, path).catch(e => console.warn("[xrf]", e));
+    if (!enabled || generation !== filterGeneration || path !== location.pathname) return;
     stats.pending = pending.length;
     report();
     if (pending.length) timer = setTimeout(flush, BATCH_DELAY_MS);
@@ -184,21 +196,24 @@
 
   function consider(article) {
     if (!alive()) return teardown();
-    if (!enabled || seen.has(article) || !isReplyPage()) return;
+    if (!enabled || seen.has(article)) return;
     seen.add(article);
-    if (article === document.querySelector('article[data-testid="tweet"]')) return;
+    if (isReplyPage() && tweetId(article) === location.pathname.match(/\/status\/(\d+)/)?.[1]) return;
     const data = extract(article);
-    if (!data.id || !data.text) return;
+    if (!data.id || (!data.text && !data.displayName)) return;
     stats.scanned++;
     addMarkButton(article, data);
     considerRules(article, data);
   }
 
   const considerRules = guard(async function considerRulesImpl(article, data) {
+    const path = location.pathname, generation = filterGeneration;
     const got = await chrome.storage.local.get("keep:" + data.id);
+    if (!enabled || generation !== filterGeneration || path !== location.pathname || !article.isConnected) return;
     if (got["keep:" + data.id]) return;  // user said "误判": never hide this one again
-    const rule = XRF_RULES.classify(data, custom);
+    const rule = (isReplyPage() ? XRF_RULES.classify : XRF_RULES.classifyTimeline)(data, custom);
     if (rule) { console.debug("[xrf] rule hit", rule, data.handle); return collapse(article, rule, null, data); }
+    if (!isReplyPage()) return;
     pending.push({ el: article, data });
     stats.pending = pending.length;
     clearTimeout(timer); timer = setTimeout(flush, BATCH_DELAY_MS);
@@ -210,6 +225,8 @@
   }
 
   function setEnabled(on) {
+    filterGeneration++;
+    clearTimeout(timer); pending = [];
     enabled = on;
     if (!on) { expandAll(); pending = []; stats.pending = 0; chrome.runtime.sendMessage({ type: "count", n: 0 }).catch(() => {}); renderPill(); return; }
     seen = new WeakSet();
@@ -225,11 +242,11 @@
   chrome.storage.onChanged.addListener((ch, area) => {
     if (area !== "sync") return;
     if (ch.enabled) setEnabled(ch.enabled.newValue !== false);
-    if (ch.customKeywords) custom.keywords = ch.customKeywords.newValue || [];
+    if (ch.customKeywords) { custom.keywords = ch.customKeywords.newValue || []; if (enabled) { expandAll(); setEnabled(true); } }
     if (ch.blockedHandles) { custom.handles = ch.blockedHandles.newValue || []; if (enabled) setEnabled(true); }
   });
   let lastPath = location.pathname;  // X is an SPA: reset per-page stats when the route changes
-  routeTimer = setInterval(() => { if (!alive()) return teardown(); if (location.pathname !== lastPath) { lastPath = location.pathname; Object.assign(stats, { scanned: 0, byRule: 0, byJev: 0, pending: 0, note: "" }); pending = []; report(); } }, 800);
+  routeTimer = setInterval(() => { if (!alive()) return teardown(); if (location.pathname !== lastPath) { lastPath = location.pathname; clearTimeout(timer); pending = []; if (enabled) { expandAll(); setEnabled(true); } report(); } }, 800);
 
   chrome.storage.sync.get({ enabled: true, customKeywords: [], blockedHandles: [] }).then(s => {
     enabled = s.enabled !== false;

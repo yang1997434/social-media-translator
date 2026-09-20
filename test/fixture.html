@@ -14,9 +14,11 @@ window.chrome = {
     sendMessage: async msg => { window.__xrfMsgs.push(msg); if (msg.type !== "classify") return { ok: true };
       window.__xrfLastMsg = msg; return { mode: "proxy", verdicts: msg.replies.map(r => CANNED[r.id] ?? null) }; } },
 };
-history.replaceState({}, "", "/thsottiaux/status/100" + location.search);
+if (location.search.includes('keep')) mem['keep:200'] = true;
+history.replaceState({}, "", (location.search.includes('timeline') ? '/home' : "/thsottiaux/status/100") + location.search);
 </script>
 <div id="timeline">
+<article data-testid="tweet"><div data-testid="User-Name"><a href="/CrystalEngc7"><b>高秀🌸同城上门♥线下选妃</b></a></div><a href="/CrystalEngc7/status/200"><small>24m</small></a><div data-testid="tweetText">应该没人比我玩的开了吧🙃🍎我福不黑不信你看</div></article>
 <article data-testid="tweet"><div data-testid="User-Name"><a href="/thsottiaux"><b>Tibo</b> <svg data-testid="icon-verified" width="12" height="12"><circle r="6" cx="6" cy="6" fill="#1d9bf0"/></svg></a></div><a href="/thsottiaux/status/100"><small>2h</small></a><div data-testid="tweetText">Update on rate limits in Codex. We found some inefficiencies when using images in long sessions and shipped fixes.</div></article>
 <article data-testid="tweet"><div data-testid="User-Name"><a href="/dev_amy"><b>Amy</b></a></div><a href="/dev_amy/status/101"><small>1h</small></a><div data-testid="tweetText">Does the compaction fix also apply to the CLI or only the desktop app?</div></article>
 <article data-testid="tweet"><div data-testid="User-Name"><a href="/growthguru"><b>Growth Guru</b></a></div><a href="/growthguru/status/102"><small>1h</small></a><div data-testid="tweetText">Great insights! Leveraging AI to unlock efficiency is truly the future of work. Thanks for sharing!</div></article>

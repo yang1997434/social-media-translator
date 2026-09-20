@@ -1,27 +1,50 @@
 <!doctype html><html lang="zh"><head><meta charset="utf-8"><link rel="stylesheet" href="ui.css">
 <style>
-body{width:320px;padding:12px}
-.top{display:flex;align-items:center;gap:10px;margin:2px 4px 12px}
-.top h1{font-size:15px;margin:0;line-height:1.2}.top .sub{font-size:12px;color:var(--muted)}
-.top .grow{flex:1}.gear{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:var(--muted);cursor:pointer;font-size:16px}.gear:hover{background:rgba(128,128,128,.12);color:var(--text);text-decoration:none}
-.card-body{margin-top:10px;font-size:13px}.card-body .big{font-size:22px;font-weight:700;line-height:1.1}
-.card-body .line{color:var(--muted);font-size:12px;margin-top:3px}
-.cta{margin-top:10px;display:flex;gap:8px;align-items:center}.cta button{flex:1}
-footer{margin:12px 4px 2px;font-size:11px;color:var(--muted);display:flex;justify-content:space-between}
-.off .card-body{opacity:.5}
+/* Glass card over soft colour blobs: the blur needs something behind it to bend. */
+body{width:336px;padding:14px 14px 10px;background:radial-gradient(440px 280px at -8% -12%,rgba(91,79,207,.42),transparent 62%),radial-gradient(400px 280px at 108% 112%,rgba(29,155,240,.40),transparent 62%),radial-gradient(300px 200px at 10% 105%,rgba(217,119,87,.22),transparent 60%),var(--bg)}
+@media(prefers-color-scheme:dark){body{background:radial-gradient(420px 260px at -8% -12%,rgba(140,126,255,.32),transparent 62%),radial-gradient(380px 260px at 108% 112%,rgba(29,155,240,.28),transparent 62%),var(--bg)}}
+.top{display:flex;align-items:center;gap:9px;margin:0 2px 12px}
+.top h1{font-size:15px;margin:0;line-height:1.2;letter-spacing:-.01em}
+.top .grow{flex:1}.gear{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:var(--muted);cursor:pointer;font-size:16px;transition:.15s}.gear:hover{background:rgba(128,128,128,.12);color:var(--text);text-decoration:none}
+.card{position:relative;overflow:hidden;padding:16px 16px 14px;isolation:isolate;
+  background:rgba(255,255,255,.38);backdrop-filter:blur(16px) saturate(1.5);-webkit-backdrop-filter:blur(14px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.75);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 1px 1px rgba(16,24,40,.03),0 2px 6px rgba(16,24,40,.04),0 10px 28px rgba(16,24,40,.08);
+  transition:box-shadow .18s}
+@media(prefers-color-scheme:dark){.card{background:rgba(24,29,35,.55);border-color:rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 1px rgba(0,0,0,.25),0 2px 6px rgba(0,0,0,.25),0 10px 28px rgba(0,0,0,.45)}}
+.card::after{content:"";position:absolute;top:0;bottom:0;left:0;width:46%;pointer-events:none;z-index:-1;   /* specular streak */
+  background:linear-gradient(105deg,transparent,rgba(110,98,230,.14) 40%,rgba(255,255,255,.7) 50%,rgba(110,98,230,.14) 60%,transparent);transform:translateX(-170%) skewX(-14deg);transition:transform .65s cubic-bezier(.16,1,.3,1)}
+@media(prefers-color-scheme:dark){.card::after{background:linear-gradient(105deg,transparent,rgba(255,255,255,.35),transparent)}}
+.card:hover::after{transform:translateX(220%) skewX(-14deg)}
+.cta button,.gear{transition:transform .18s cubic-bezier(.16,1,.3,1),filter .15s,background .15s}.cta button:active,.gear:active{transform:scale(.96)}
+.card-head .sub{display:flex;align-items:center;gap:6px;min-width:0;font-size:12px;color:var(--muted);white-space:nowrap}
+.card-head .sub .model{overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.card-body{margin-top:14px;font-size:13px}
+.card-body .big{display:flex;align-items:baseline;gap:6px;font-size:28px;font-weight:700;line-height:1;letter-spacing:-.02em}.card-body .big .unit{font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0}
+.card-body .line{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;margin-top:6px;min-height:18px}
+.card-body .line:first-child{margin-top:0}
+.card-body .line.bad{color:var(--bad)}.card-body .line .dot{width:6px;height:6px;border-radius:50%;background:var(--tr);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.cta{margin-top:12px;display:flex;gap:8px;align-items:center}.cta button{flex:1;padding:10px 14px;font-size:14px}
+/* usage strip: cost is what the user watches, paragraphs and tokens explain it */
+.usage{--hair:rgba(128,128,128,.28);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--hair)}
+.usage .k{font-size:11px;color:var(--muted);letter-spacing:.02em}.usage .v{font-size:15px;font-weight:700;line-height:1.3;margin-top:2px;letter-spacing:-.01em}
+.usage .s{font-size:11px;line-height:1.45;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.usage .u+.u{padding-left:8px;border-left:1px solid var(--hair)}
+.usage a{font-size:11px}
+footer{margin:12px 4px 0;font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.off .card-body,.off .usage{opacity:.55}
 </style></head><body>
-<div class="top"><div class="ico f" style="width:30px;height:30px;font-size:13px;border-radius:8px">X</div><div class="grow"><h1>X 助手</h1><div class="sub">自动翻译 · 评论过滤</div></div><a class="gear" id="gear" title="设置">⚙</a></div>
+<div class="top"><img src="icons/logo.svg" width="26" height="26" alt="" style="flex-shrink:0"><div class="grow"><h1>Social Media Translator</h1></div><a class="gear" id="gear" title="设置">⚙</a></div>
 
 <section class="card" id="trCard">
-  <div class="card-head"><span class="ico tr">译</span><div class="grow"><div class="title">自动翻译</div><div class="muted small" id="trSub">…</div></div>
+  <div class="card-head"><span class="ico tr">译</span><div class="grow"><div class="title">自动翻译</div><div class="sub" id="trSub">…</div></div>
     <label class="switch tr"><input type="checkbox" id="trEnabled"><span></span></label></div>
   <div class="card-body" id="trBody"></div>
-</section>
-
-<section class="card" id="fCard">
-  <div class="card-head"><span class="ico f">滤</span><div class="grow"><div class="title">评论过滤</div><div class="muted small" id="fSub">…</div></div>
-    <label class="switch"><input type="checkbox" id="fEnabled"><span></span></label></div>
-  <div class="card-body" id="fBody"></div>
+  <div class="usage num" id="usage" hidden>
+    <div class="u"><div class="k">今日</div><div class="v" id="uToday">–</div><div class="s" id="uTodayS"></div></div>
+    <div class="u"><div class="k">本月</div><div class="v" id="uMonth">–</div><div class="s" id="uMonthS"></div></div>
+    <div class="u"><div class="k">累计</div><div class="v" id="uTotal">–</div><div class="s" id="uTotalS"></div></div>
+  </div>
 </section>
 
 <footer><span id="ver"></span><a id="optLink">打开设置</a></footer>

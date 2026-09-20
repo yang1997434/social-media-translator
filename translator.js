@@ -4,23 +4,41 @@
   if (window.__xrfTr) return;
   window.__xrfTr = true;
 
-  const SITE = /(^|\.)reddit\.com$/.test(location.hostname) ? "reddit" : "x";
-  const SELECTOR = SITE === "x"
-    ? '[data-testid="tweetText"], [data-testid="UserDescription"]'
-    : ['h1[slot="title"]', 'a[slot="title"]', 'div[slot="text-body"] p', 'div[slot="text-body"] li', '[slot="comment"] p', '[slot="comment"] li',
-       "a.title", ".usertext-body p", ".usertext-body li"].join(", ");
+  const host = location.hostname;
+  // x / reddit start on their own (content_scripts in the manifest); any other page is "generic" and only translates
+  // when the popup's 翻译此页 button injects this script and sends trTogglePage.
+  const SITE = (host === "localhost" && document.documentElement.dataset.xrfSite)   // fixtures only
+    || (/(^|\.)(x\.com|twitter\.com)$/.test(host) ? "x" : /(^|\.)reddit\.com$/.test(host) ? "reddit" : "generic");
+  const AUTO = SITE !== "generic";
+  const SELECTOR = {
+    x: '[data-testid="tweetText"], [data-testid="UserDescription"]',
+    reddit: ['h1[slot="title"]', 'a[slot="title"]', '[slot="text-body"]', 'shreddit-post-text-body', '[slot="text-body"] p', '[slot="text-body"] li', '[slot="comment"] p', '[slot="comment"] li',
+      "a.title", ".usertext-body p", ".usertext-body li"].join(", "),
+    generic: "p, h1, h2, h3, h4, h5, h6, li, blockquote, dd, dt, figcaption, td, th, summary, div",
+  }[SITE];
+  const BLOCKS = "p, div, ul, ol, li, dd, dt, figcaption, td, th, summary, table, section, article, h1, h2, h3, h4, h5, h6, blockquote, pre, form, nav, header, footer";
+  const SKIP_INSIDE = "nav, header, footer, aside, form, pre, code, script, style, noscript, textarea, button, select, [contenteditable], [aria-hidden=true], .xrf-bar, .xrf-pill, .xrf-toast";
   // Inline pieces we never send to the model: they become [[n]] placeholders and are put back verbatim.
-  const ATOM = "a, img, code, video, button";
+  const ATOM = "a, img, code, video, button, kbd, svg, input, select, textarea, iframe";
   const OURS = ".xrf-tr, .xrf-tr-toggle";
+  let scanTimer = null;
 
   let cfg = { mode: "replace", concurrency: 3, batch: 6 };
-  let enabled = false, inflight = 0, io = null, mo = null, dead = false;
+  let enabled = false, inflight = 0, io = null, mo = null, dead = false, generation = 0;
+  const activeItems = new WeakMap();
   const queue = [];
   const pending = new Map();           // reqId -> items, for streamed partial results
-  const stats = { translated: 0, failed: 0 };
+  const watchdogs = new Map();         // reqId -> reset the lost-worker watchdog
+  const autoRetries = new WeakMap();   // el -> automatic retries after transient failures (stall, 5xx, 429, network)
+  const TRANSIENT = /超时|无响应|繁忙|限速|网络|后台未响应|\b(?:429|50[0-9])\b/;
+  const stats = { translated: 0, failed: 0, lastError: "" };
 
   const alive = () => !dead && !!chrome.runtime?.id;
-  function teardown() { if (dead) return; dead = true; io?.disconnect(); mo?.disconnect(); }
+  function teardown() {
+    if (dead) return;
+    dead = true; io?.disconnect(); mo?.disconnect();
+    clearTimeout(scanTimer);
+  }
   const guard = fn => async (...a) => {
     if (!alive()) return teardown();
     try { return await fn(...a); }
@@ -48,7 +66,10 @@
     const out = [];
     for (const el of document.querySelectorAll(SELECTOR)) {
       if (el.dataset.xrfTr || el.closest(OURS)) continue;
-      if (el.querySelector(SELECTOR)) continue;   // innermost only, else nested li>p would be translated twice
+      if (SITE === "generic") {
+        if (el.closest(SKIP_INSIDE)) continue;
+        if (el.querySelector(BLOCKS)) continue;                    // only leaf blocks: a div that merely wraps other blocks has no text of its own
+      } else if (el.querySelector(SELECTOR)) continue;           // innermost only, else nested li>p would be translated twice
       out.push(el);
     }
     return out;
@@ -90,6 +111,7 @@
       const cs = getComputedStyle(el);
       node.style.fontSize = cs.fontSize;
       node.style.lineHeight = cs.lineHeight;
+      if (el.tagName === "LI") el.style.setProperty("--xrf-fs", cs.fontSize);   // ::marker sizes off the li itself, keep the bullet visible
       const toggle = document.createElement("span");
       toggle.className = "xrf-tr-toggle"; toggle.textContent = "原文"; toggle.title = "查看原文 / 译文";
       toggle.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); el.classList.toggle("xrf-show-orig"); toggle.textContent = el.classList.contains("xrf-show-orig") ? "译文" : "原文"; });
@@ -100,7 +122,9 @@
       el.appendChild(node);
     }
     el.dataset.xrfTr = "done";
-    stats.translated++;
+    item.translation = translated;
+    autoRetries.delete(el);
+    if (!item.rendered) { item.rendered = true; stats.translated++; }
   }
 
   function renderError(item, msg) {
@@ -108,14 +132,30 @@
     el.classList.remove("xrf-tr-loading");
     el.dataset.xrfTr = "error";
     stats.failed++;
+    stats.lastError = msg || "未收到译文";
+    const status = String(msg).match(/\b(?:400|401|402|403|404|429|50[0-9])\b/)?.[0];
+    const label = status ? `翻译失败 (${status})` : /排队/.test(msg) ? "翻译排队超时" : /超时/.test(msg) ? "翻译超时" : /未配置/.test(msg) ? "未配置翻译 Key" : /格式|解析/.test(msg) ? "译文格式异常" : "翻译失败";
     const n = document.createElement("span");
-    n.className = "xrf-tr-toggle xrf-tr-err"; n.textContent = "⟳ 翻译失败"; n.title = msg + "，点击重试";
-    n.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); reset(el); el.dataset.xrfTr = "seen"; io?.observe(el); });
+    n.className = "xrf-tr-toggle xrf-tr-err"; n.textContent = "⟳ " + label; n.title = stats.lastError + "，点击重试";
+    n.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); retry(el); });
     el.appendChild(n);
+    // Provider hiccups clear up on their own; retry twice (3s, 6s) before leaving it to the user's click.
+    const tries = autoRetries.get(el) || 0;
+    if (TRANSIENT.test(msg) && tries < 2) {
+      autoRetries.set(el, tries + 1);
+      const gen = generation;
+      setTimeout(() => { if (enabled && gen === generation && el.isConnected && el.dataset.xrfTr === "error") retry(el); }, 3000 * 2 ** tries);
+    }
   }
+  function retry(el) { reset(el); el.dataset.xrfTr = "seen"; io?.observe(el); }
 
   function clearOurs(el) { el.querySelectorAll(":scope > .xrf-tr, :scope > .xrf-tr-toggle").forEach(n => n.remove()); }
-  function reset(el) { clearOurs(el); el.classList.remove("xrf-replaced", "xrf-show-orig", "xrf-tr-loading"); delete el.dataset.xrfTr; }
+  function reset(el) {
+    activeItems.delete(el);
+    clearOurs(el); el.classList.remove("xrf-replaced", "xrf-show-orig", "xrf-tr-loading");
+    el.style.removeProperty("--xrf-fs"); delete el.dataset.xrfTr;
+  }
+  const current = it => enabled && it.generation === generation && it.el.isConnected && activeItems.get(it.el) === it;
 
   // ---- pipeline: observe -> queue (document order) -> batch -> background -> stream back ----
   function scan() {
@@ -132,55 +172,95 @@
       const { text, atoms } = extract(el);
       if (!text || !XRF_LANG.shouldTranslate(text, el.getAttribute("lang"))) { el.dataset.xrfTr = "skip"; continue; }
       el.dataset.xrfTr = "queued";
-      queue.push({ el, text, atoms });
+      const item = { el, text, atoms, generation };
+      activeItems.set(el, item);
+      queue.push(item);
     }
     pump();
   }
 
   const follows = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  const visible = el => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; };
+  const priority = el => SITE !== "generic" ? 0 : el.closest("article, main, [role=main]") ? 0 : /^(H[1-6]|P|LI|BLOCKQUOTE)$/.test(el.tagName) ? 1 : 2;
   function pump() {
-    if (queue.length > 1) queue.sort((a, b) => (follows(a.el, b.el) ? -1 : 1));
+    if (queue.length > 1) queue.sort((a, b) => Number(visible(b.el)) - Number(visible(a.el)) || priority(a.el) - priority(b.el) || (follows(a.el, b.el) ? -1 : 1));
     while (enabled && inflight < cfg.concurrency && queue.length) {
-      const batch = queue.splice(0, cfg.batch);
+      const batch = [];
+      let chars = 0;
+      while (queue.length && batch.length < (SITE === "generic" ? Math.min(cfg.batch, 3) : cfg.batch)) {
+        const next = queue[0];
+        if (!current(next)) { queue.shift(); continue; }
+        // Social feeds keep the original fast path: up to six items per request.
+        // Generic pages cap long mixed paragraphs to keep a huge article section
+        // from delaying everything behind it.
+        if (batch.length && ((SITE === "generic" && chars + next.text.length > 900) || visible(next.el) !== visible(batch[0].el))) break;
+        batch.push(queue.shift()); chars += next.text.length;
+      }
+      if (!batch.length) continue;
       inflight++;
       translateBatch(batch).finally(() => { inflight--; pump(); });
     }
   }
 
+  function settle(item, text, err, final = false) {
+    if (!current(item)) return;
+    // A malformed batch may have streamed one apparently complete item before
+    // the worker detects the wrong array length and repairs it with single-item
+    // requests. Let the authoritative final result replace that early preview.
+    if (item.status !== "waiting") {
+      if (final && text && item.status === "done" && text !== item.translation) render(item, text);
+      return;
+    }
+    if (text) { item.status = "done"; render(item, text); }
+    else { item.status = "error"; renderError(item, err || "翻译失败"); }
+  }
+
   const translateBatch = guard(async function translateBatchImpl(items) {
-    items = items.filter(it => it.el.isConnected);
+    items = items.filter(current);
     if (!items.length) return;
     items.forEach(it => { it.status = "waiting"; it.el.classList.add("xrf-tr-loading"); });
     const reqId = Math.random().toString(36).slice(2);
     pending.set(reqId, items);
-    let resp;
-    try { resp = await chrome.runtime.sendMessage({ type: "translate", texts: items.map(it => it.text), reqId }); }
-    catch (e) { resp = { error: String(e?.message || e) }; }
-    pending.delete(reqId);
-    items.forEach((it, i) => {
-      if (it.status !== "waiting") return;
-      const t = resp?.translations?.[i];
-      if (t) render(it, t); else renderError(it, resp?.error || "翻译失败");
+    let resp, timeout;
+    const lostWorker = new Promise(resolve => {
+      const touch = () => { clearTimeout(timeout); timeout = setTimeout(() => resolve({ error: "翻译后台未响应，请刷新页面后重试" }), 45000); };
+      watchdogs.set(reqId, touch);
+      touch();
     });
+    try { resp = await Promise.race([
+      chrome.runtime.sendMessage({ type: "translate", texts: items.map(it => it.text), reqId }),
+      lostWorker,
+    ]); }
+    catch (e) { resp = { error: String(e?.message || e) }; }
+    finally { clearTimeout(timeout); watchdogs.delete(reqId); }
+    pending.delete(reqId);
+    items.forEach((it, i) => settle(it, resp?.translations?.[i], resp?.error, true));
   });
 
   // React/Lit re-rendered a translated node (e.g. "Show more"): drop our copy and translate the new content.
   function onMutations(muts) {
     let dirty = false;
     for (const m of muts) {
-      const changed = [...m.addedNodes, ...m.removedNodes];
-      if (!changed.length) continue;
+      const changed = m.type === "childList" ? [...m.addedNodes, ...m.removedNodes] : [];
       const target = m.target.nodeType === 1 ? m.target : m.target.parentElement;
       if (target?.closest?.(OURS)) continue;                                              // inside our own nodes (toggle label etc.)
-      if (changed.every(n => n.nodeType === 1 && n.matches?.(OURS))) continue;            // we added/removed our own nodes
+      if (changed.length && changed.every(n => n.nodeType === 1 && n.matches?.(OURS))) continue; // we added/removed our own nodes
       const host = target?.closest?.("[data-xrf-tr]");
-      if (host && host.dataset.xrfTr !== "seen") { reset(host); host.dataset.xrfTr = "seen"; io?.observe(host); }
+      // X sometimes reuses the same tweetText element and only changes its text node.
+      // Invalidate every completed/skipped/in-flight result when its source changes.
+      if (host && host.dataset.xrfTr !== "seen") {
+        reset(host); host.dataset.xrfTr = "seen"; io?.observe(host);
+      }
       dirty = true;
     }
     if (dirty) scheduleScan();
   }
-  let scanTimer = null;
-  const scheduleScan = () => { clearTimeout(scanTimer); scanTimer = setTimeout(scan, 300); };
+  // Throttle rather than debounce. X mutates continuously (metrics, media and
+  // recommendations); resetting the timer on every mutation can starve scanning forever.
+  const scheduleScan = () => {
+    if (scanTimer || !enabled) return;
+    scanTimer = setTimeout(() => { scanTimer = null; scan(); }, 200);
+  };
 
   // Sites pick their own theme independent of the OS: light body text means a dark page.
   function detectTheme() {
@@ -193,37 +273,57 @@
   function start() {
     if (enabled || !alive()) return;
     enabled = true;
+    stats.translated = 0; stats.failed = 0; stats.lastError = "";
     detectTheme();
-    io = new IntersectionObserver(onIntersect, { rootMargin: "300px 0px" });
+    io = new IntersectionObserver(onIntersect, { rootMargin: "600px 0px" });   // ~two tweets ahead: translated before they scroll in
     mo = new MutationObserver(onMutations);
-    mo.observe(document.body, { childList: true, subtree: true });
+    mo.observe(document.body, { childList: true, characterData: true, subtree: true });
     scan();
   }
 
   function stop() {
     enabled = false;
+    clearTimeout(scanTimer);
+    scanTimer = null;
+    generation++;
     io?.disconnect(); mo?.disconnect(); io = mo = null;
-    queue.length = 0; pending.clear();
+    queue.length = 0; pending.clear(); watchdogs.clear();
     document.querySelectorAll("[data-xrf-tr]").forEach(reset);
   }
 
   const applyConfig = guard(async function applyConfigImpl() {
     const c = await chrome.runtime.sendMessage({ type: "trConfig" });
-    if (!c) return;
+    if (!c) return false;
     const modeChanged = c.mode !== cfg.mode;
     cfg = { mode: c.mode, concurrency: c.concurrency, batch: c.batch };
-    const want = c.configured && c.enabled && c.sites?.[SITE] !== false;
+    const want = c.configured && c.enabled && (AUTO ? c.sites?.[SITE] !== false : enabled);
     if (want && !enabled) start();
     else if (!want && enabled) stop();
     else if (want && modeChanged) { stop(); start(); }   // re-render from cache in the new mode
+    return c.configured;
   });
 
   chrome.runtime.onMessage.addListener((msg, _s, sendResponse) => {
-    if (msg.type === "getTrStats") sendResponse({ enabled, site: SITE, translated: stats.translated, failed: stats.failed, pending: queue.length + [...pending.values()].flat().filter(i => i.status === "waiting").length });
-    else if (msg.type === "trPartial") {
-      const item = pending.get(msg.reqId)?.[msg.index];
-      if (enabled && item && item.status === "waiting") { item.status = "done"; render(item, msg.text); }
+    if (msg.type === "getTrStats") sendResponse({ enabled, site: SITE, translated: stats.translated, failed: stats.failed, lastError: stats.lastError,
+      pending: queue.filter(current).length + [...pending.values()].flat().filter(it => current(it) && it.status === "waiting").length });
+    else if (msg.type === "trTogglePage") {
+      if (enabled) { stop(); sendResponse({ enabled: false }); }
+      else applyConfig().then(async configured => {
+        if (configured) {
+          const { tr = {} } = await chrome.storage.sync.get({ tr: {} });
+          if (tr.enabled === false) await chrome.storage.sync.set({ tr: { ...tr, enabled: true } });
+          start();
+        }
+        sendResponse({ enabled, configured });
+      });
+      return true;
     }
+    else if (msg.type === "trPartial") {
+      watchdogs.get(msg.reqId)?.();
+      const item = pending.get(msg.reqId)?.[msg.index];
+      if (enabled && item) settle(item, msg.text);
+    }
+    else if (msg.type === "trProgress") watchdogs.get(msg.reqId)?.();
   });
   chrome.storage.onChanged.addListener((ch, area) => { if (area === "sync" && ch.tr) applyConfig(); });
   applyConfig();

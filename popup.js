@@ -1,49 +1,90 @@
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e5 ? (n / 1e3).toFixed(0) + "k" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(n);
+const yuan = v => v >= 100 ? "¥" + v.toFixed(0) : v >= 1 ? "¥" + v.toFixed(2) : "¥" + v.toFixed(3);
 
 async function activeTab() { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); return tab; }
 const site = url => /^https:\/\/(x|twitter)\.com\//.test(url || "") ? "x" : /^https:\/\/([\w-]+\.)?reddit\.com\//.test(url || "") ? "reddit" : null;
-const isStatus = url => /^https:\/\/(x|twitter)\.com\/[^/]+\/status\/\d+/.test(url || "");
 const ask = (tab, msg) => chrome.tabs.sendMessage(tab.id, msg).catch(() => null);
 const openOptions = () => chrome.runtime.openOptionsPage();
+let translateTimer = null;
+let price = null;   // [¥/M in, ¥/M out] for the configured model, or null when unknown
+
+const line = (text, cls = "", dot = false) => `<div class="line ${cls}">${dot ? '<span class="dot"></span>' : ""}${text}</div>`;
+// Count, then only what needs saying: in-flight, failures, the last error.
+const progress = st => `<div class="big">${st.translated}<span class="unit">段已翻译</span></div>`
+  + (st.pending || st.failed ? line([st.pending ? `翻译中 ${st.pending}` : "", st.failed ? `<span style="color:var(--bad)">失败 ${st.failed}</span>` : ""].filter(Boolean).join(" · "), "", !!st.pending) : "")
+  + (st.lastError ? line(esc(st.lastError), "bad") : "");
 
 async function renderTranslate(tab) {
+  clearTimeout(translateTimer);
   const cfg = await chrome.runtime.sendMessage({ type: "trConfig" }).catch(() => null);
   const card = $("trCard"), body = $("trBody");
+  price = cfg?.price || null;
   $("trEnabled").checked = !!cfg?.enabled;
   card.classList.toggle("off", !cfg?.enabled);
   if (!cfg?.configured) {
+    $("usage").hidden = true;
     $("trSub").textContent = "还没配置翻译 API";
-    body.innerHTML = `<div class="line">填一个硅基流动 / OpenRouter 的 API Key，打开 X 或 Reddit 就会自动把外文帖子和评论变成中文。</div><div class="cta"><button class="tr" id="setup">去配置</button></div>`;
+    body.innerHTML = `<div class="cta"><button class="tr" id="setup">填写硅基流动 API Key</button></div>`;
     $("setup").onclick = openOptions;
     return;
   }
+  renderUsage();
   const model = (cfg.model || "").split("/").pop();
-  $("trSub").textContent = `${cfg.mode === "replace" ? "原地替换" : "双语对照"} · ${model}`;
+  $("trSub").innerHTML = `<span>${esc(cfg.providerName || "")}</span><span>·</span><span class="model" title="${esc(cfg.model || "")}">${esc(model)}</span>${cfg.mode === "replace" ? "" : "<span>·</span><span>双语</span>"}`;
   const s = site(tab?.url);
-  if (!s) { body.innerHTML = `<div class="line">在 X 或 Reddit 页面上自动生效。</div>`; return; }
-  if (!cfg.enabled) { body.innerHTML = `<div class="line">已关闭。打开开关后刷新页面即可。</div>`; return; }
-  if (cfg.sites?.[s] === false) { body.innerHTML = `<div class="line">${s === "x" ? "X" : "Reddit"} 已在设置里关闭自动翻译。</div>`; return; }
+  if (!s) return renderGeneric(tab);
+  if (!cfg.enabled) { body.innerHTML = line("已关闭"); return; }
+  if (cfg.sites?.[s] === false) { body.innerHTML = line(`${s === "x" ? "X" : "Reddit"} 已在设置中关闭`); return; }
   const st = await ask(tab, { type: "getTrStats" });
-  if (!st) { body.innerHTML = `<div class="line">刷新此页面后生效（插件刚安装或刚更新）</div>`; return; }
-  body.innerHTML = `<div class="big num">${st.translated} <span style="font-size:13px;font-weight:500">段已翻译</span></div><div class="line">${st.pending ? `翻译中 ${st.pending} · ` : ""}滚动到哪翻到哪${st.failed ? ` · <span style="color:var(--bad)">失败 ${st.failed}</span>` : ""}</div>`;
+  if (!st) { body.innerHTML = line("刷新页面后生效"); return; }
+  body.innerHTML = progress(st);
+  if (st.pending) translateTimer = setTimeout(() => renderTranslate(tab), 1500);
 }
 
-async function renderFilter(tab) {
-  const { enabled, apiKey } = await chrome.storage.sync.get({ enabled: true, apiKey: "" });
-  $("fEnabled").checked = enabled;
-  $("fCard").classList.toggle("off", !enabled);
-  const q = apiKey ? null : await chrome.runtime.sendMessage({ type: "getQuota" }).catch(() => null);
-  $("fSub").textContent = apiKey ? "TypeSafe 直连 · 不限量" : q?.limit ? `免费额度 · 今日 ${q.used} / ${q.limit}` : "免费额度 · 每天 300 条";
-  const body = $("fBody");
-  if (!isStatus(tab?.url)) { body.innerHTML = `<div class="line">打开一条推文的详情页，评论区会自动折叠推广、互动饵、跑题和 AI 套话。</div>`; return; }
-  if (!enabled) { body.innerHTML = `<div class="line">已关闭。</div>`; return; }
-  const s = await ask(tab, { type: "getStats" });
-  if (!s) { body.innerHTML = `<div class="line">刷新此页面后生效（插件刚安装或刚更新）</div>`; return; }
-  const n = s.byRule + s.byJev;
-  body.innerHTML = `<div class="big num">${n} <span style="font-size:13px;font-weight:500">条已隐藏</span></div><div class="line">扫描 ${s.scanned} · 规则 ${s.byRule} · AI ${s.byJev}${s.pending ? ` · 判定中 ${s.pending}` : ""}${s.note ? ` · <span style="color:var(--warn)">${esc(s.note)}</span>` : ""}</div>
-    <div class="cta"><button class="ghost sm" id="expand" ${n ? "" : "disabled"}>全部展开</button></div>`;
-  $("expand").onclick = async () => { await ask(tab, { type: "expandAll" }); renderFilter(tab); };
+// Any other page: inject on demand (activeTab), toggle with one button.
+async function renderGeneric(tab) {
+  clearTimeout(translateTimer);
+  const body = $("trBody");
+  const injectable = /^https?:/.test(tab?.url || "");
+  if (!injectable) { body.innerHTML = line("此页面不支持"); return; }
+  const st = await ask(tab, { type: "getTrStats" });
+  const on = !!st?.enabled;
+  body.innerHTML = (on ? progress(st) : "") + `<div class="cta"><button class="${on ? "ghost" : "tr"}" id="pageTr">${on ? "还原此页" : "翻译此页"}</button></div>`;
+  $("pageTr").onclick = async () => {
+    clearTimeout(translateTimer);
+    $("pageTr").disabled = true;
+    try {
+      if (!st) {
+        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ["translator.css"] });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["lang.js", "translator.js"] });
+      }
+      const r = await ask(tab, { type: "trTogglePage" });
+      if (!r) throw new Error("页面未响应，请刷新后重试");
+      if (r && r.configured === false) { openOptions(); return; }
+    } catch (e) { body.innerHTML = line(esc(e.message), "bad"); return; }
+    translateTimer = setTimeout(() => renderTranslate(tab), 300);
+  };
+  if (on) translateTimer = setTimeout(() => renderTranslate(tab), 1500);
+}
+
+// Usage strip: cost when the model's price is known, tokens otherwise.
+async function renderUsage() {
+  const { tstats } = await chrome.storage.local.get({ tstats: null });
+  const strip = $("usage");
+  if (!tstats) { strip.hidden = true; return; }
+  const now = new Date().toISOString();
+  const buckets = { Today: tstats.day === now.slice(0, 10) ? tstats.today : null, Month: tstats.month === now.slice(0, 7) ? tstats.mon : null, Total: tstats.total };
+  for (const [k, b] of Object.entries(buckets)) {
+    const v = $("u" + k), s = $("u" + k + "S");
+    if (!b || !b.n) { v.textContent = price ? "¥0" : "0"; s.innerHTML = "尚无翻译"; continue; }
+    const tokens = (b.in || 0) + (b.out || 0);
+    const booked = typeof b.cost === "number";   // pre-0.6.3 buckets only have tokens
+    if (booked || price) { v.textContent = yuan(booked ? b.cost : ((b.in || 0) * price[0] + (b.out || 0) * price[1]) / 1e6); s.innerHTML = `${fmt(b.n)} 段<br>${fmt(tokens)} tokens`; }
+    else { v.textContent = fmt(tokens); s.innerHTML = `${fmt(b.n)} 段<br><a>填单价算钱</a>`; s.querySelector("a").onclick = openOptions; }
+  }
+  strip.hidden = false;
 }
 
 async function init() {
@@ -51,7 +92,7 @@ async function init() {
   $("gear").onclick = openOptions; $("optLink").onclick = openOptions;
   const tab = await activeTab();
   $("trEnabled").onchange = async e => { const { tr } = await chrome.storage.sync.get({ tr: {} }); await chrome.storage.sync.set({ tr: { ...tr, enabled: e.target.checked } }); renderTranslate(tab); };
-  $("fEnabled").onchange = e => { chrome.storage.sync.set({ enabled: e.target.checked }); $("fCard").classList.toggle("off", !e.target.checked); setTimeout(() => renderFilter(tab), 200); };
-  renderTranslate(tab); renderFilter(tab);
+  chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.tstats) renderUsage(); });
+  renderTranslate(tab);
 }
 init();

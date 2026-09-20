@@ -10,17 +10,24 @@ const setChip = cb => cb.closest(".chip").classList.toggle("on", cb.checked);
 function showResult(ok, html, id = "tr_result") { const r = $(id); r.className = "result show " + (ok ? "ok" : "bad"); r.innerHTML = html; }
 
 // ---------------- translation ----------------
+let PROVIDERS = {};   // from the worker (trDefaults): host, default model, thinking switch, list prices
+const P = () => PROVIDERS[tr.provider] || Object.values(PROVIDERS)[0];
+const curModel = () => tr.models?.[tr.provider] || P().model;
 async function saveTr(patch) {
   const { tr: cur } = await chrome.storage.sync.get({ tr: {} });   // popup may have flipped the switch meanwhile
-  tr = { ...tr, ...cur, ...patch, sites: { ...tr.sites, ...(cur.sites || {}), ...(patch.sites || {}) } };
+  tr = { ...tr, ...cur, ...patch, sites: { ...tr.sites, ...(cur.sites || {}), ...(patch.sites || {}) },
+    keys: { ...tr.keys, ...(cur.keys || {}), ...(patch.keys || {}) }, models: { ...tr.models, ...(cur.models || {}), ...(patch.models || {}) } };
   await chrome.storage.sync.set({ tr });
   toast();
 }
-const provider = () => ({ baseUrl: tr.baseUrl, apiKey: $("tr_apiKey").value.trim(), model: $("tr_model").value.trim() });
+const provider = () => ({ baseUrl: P().baseUrl, apiKey: $("tr_apiKey").value.trim(), model: $("tr_model").value.trim(), thinking: P().thinking });
 
 function renderTr() {
   $("tr_enabled").checked = tr.enabled !== false;
-  $("tr_apiKey").value = tr.apiKey || ""; $("tr_model").value = tr.model || "";
+  $("tr_provider").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === tr.provider));
+  $("tr_apiKey").value = tr.keys?.[tr.provider] || ""; $("tr_apiKey").placeholder = P().keyHint;
+  $("tr_keyUrl").href = P().keyUrl;
+  $("tr_model").value = curModel();
   $("tr_mode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === tr.mode));
   for (const s of ["x", "reddit"]) { const cb = $("tr_site_" + s); cb.checked = tr.sites?.[s] !== false; setChip(cb); }
 }
@@ -28,6 +35,7 @@ function renderTr() {
 // Model names autocomplete from the provider's /models, fetched quietly once a key is present.
 const loadModels = debounce(async () => {
   const p = provider();
+  $("tr_models").innerHTML = "";
   if (!p.apiKey) return;
   const r = await chrome.runtime.sendMessage({ type: "trModels", provider: p }).catch(() => null);
   if (r?.models) $("tr_models").innerHTML = r.models.map(m => `<option value="${esc(m)}">`).join("");
@@ -46,8 +54,13 @@ async function testTr() {
 
 function bindTr() {
   $("tr_enabled").onchange = e => saveTr({ enabled: e.target.checked });
-  $("tr_apiKey").oninput = debounce(() => { saveTr({ apiKey: $("tr_apiKey").value.trim() }); loadModels(); }, 500);
-  const saveModel = async () => { const m = $("tr_model").value.trim(); await saveTr({ model: m }); applyKnownPrice(m); };
+  $("tr_provider").querySelectorAll("button").forEach(b => b.onclick = async () => {
+    if (b.dataset.v === tr.provider) return;
+    await saveTr({ provider: b.dataset.v, priceIn: null, priceOut: null });
+    renderTr(); $("tr_result").className = "result"; loadModels(); applyKnownPrice(curModel()); renderTrFoot();
+  });
+  $("tr_apiKey").oninput = debounce(() => { saveTr({ keys: { [tr.provider]: $("tr_apiKey").value.trim() } }); loadModels(); }, 500);
+  const saveModel = async () => { const m = $("tr_model").value.trim(); await saveTr({ models: { [tr.provider]: m } }); applyKnownPrice(m); };
   $("tr_model").onchange = saveModel;
   $("tr_model").oninput = debounce(saveModel, 600);
   $("tr_priceToggle").onclick = () => { $("tr_priceRow").hidden = !$("tr_priceRow").hidden; };
@@ -57,22 +70,20 @@ function bindTr() {
   for (const s of ["x", "reddit"]) $("tr_site_" + s).onchange = e => { setChip(e.target); saveTr({ sites: { [s]: e.target.checked } }); };
 }
 
-// SiliconFlow list prices, ¥ per million tokens (siliconflow.cn/pricing, 2026-09). Other models: type them in.
-const PRICES = { "Qwen/Qwen3.5-35B-A3B": [0.4, 3.2], "Qwen/Qwen3.6-35B-A3B": [1.8, 10.8] };
-const price = () => ({ pin: Number(tr.priceIn) || 0, pout: Number(tr.priceOut) || 0 });
-const cost = b => { const { pin, pout } = price(); return (b.in * pin + b.out * pout) / 1e6; };
+const price = () => { const p = (Number(tr.priceIn) || Number(tr.priceOut)) ? [Number(tr.priceIn) || 0, Number(tr.priceOut) || 0] : P().prices[curModel()] || [0, 0]; return { pin: p[0], pout: p[1] }; };
+const cost = b => { if (typeof b.cost === "number") return b.cost; const { pin, pout } = price(); return (b.in * pin + b.out * pout) / 1e6; };
 
 async function renderTrFoot() {
   const { tstats } = await chrome.storage.local.get({ tstats: { day: "", today: { n: 0, in: 0, out: 0 }, total: { n: 0, in: 0, out: 0 } } });
   const t = tstats.day === new Date().toISOString().slice(0, 10) ? tstats.today : { n: 0, in: 0, out: 0 };
   const tot = tstats.total || { n: 0, in: 0, out: 0 };
   const { pin, pout } = price();
-  const line = (k, b) => `${k} ${fmt(b.n)} 段 · ${fmt(b.in + b.out)} tokens${pin || pout ? ` · ¥${cost(b).toFixed(3)}` : ""}`;
+  const line = (k, b) => `${k} ${fmt(b.n)} 段 · ${fmt(b.in + b.out)} tokens${pin || pout || typeof b.cost === "number" ? ` · ¥${cost(b).toFixed(3)}` : ""}`;
   $("tr_foot").textContent = `${line("今日", t)}　${line("累计", tot)}`;
-  $("tr_priceIn").value = pin || ""; $("tr_priceOut").value = pout || "";
+  $("tr_priceIn").value = pin ? +pin.toFixed(2) : ""; $("tr_priceOut").value = pout ? +pout.toFixed(2) : "";
 }
-// Known model → fill its list price; unknown → keep whatever the user typed.
-function applyKnownPrice(model) { const p = PRICES[model]; if (p) return saveTr({ priceIn: p[0], priceOut: p[1] }).then(renderTrFoot); }
+// Known model → clear any typed override so the list price applies; unknown → keep whatever the user typed.
+function applyKnownPrice(model) { if (P().prices[model]) return saveTr({ priceIn: null, priceOut: null }).then(renderTrFoot); }
 
 // ---------------- filter ----------------
 async function saveF(patch) { await chrome.storage.sync.set(patch); toast(); }
@@ -116,10 +127,11 @@ async function renderFFoot() {
 
 // ---------------- init ----------------
 async function init() {
-  const { defaults } = await chrome.runtime.sendMessage({ type: "trDefaults" });
+  const { defaults, providers } = await chrome.runtime.sendMessage({ type: "trDefaults" });
+  PROVIDERS = providers || {};
   const { tr: saved } = await chrome.storage.sync.get({ tr: {} });
-  tr = { ...defaults, ...saved, baseUrl: defaults.baseUrl, sites: { ...defaults.sites, ...(saved.sites || {}) } };
-  if (tr.priceIn == null && PRICES[tr.model]) [tr.priceIn, tr.priceOut] = PRICES[tr.model];
+  tr = { ...defaults, ...saved, sites: { ...defaults.sites, ...(saved.sites || {}) }, keys: { ...(saved.keys || {}) }, models: { ...(saved.models || {}) } };
+  if (!PROVIDERS[tr.provider]) tr.provider = defaults.provider;
   renderTr(); bindTr(); renderTrFoot(); loadModels();
   await renderF(); bindF(); renderFFoot();
   // Live updates: marking a reply on x.com or a translation finishing shows up here without reloading.

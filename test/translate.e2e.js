@@ -1,13 +1,15 @@
 // Real request through llm.js. Proves: endpoint reachable, model translates to Chinese, [[n]] placeholders survive, streaming parses.
 //   SILICONFLOW_API_KEY=sk-... node test/translate.e2e.js
 //   OPENROUTER_API_KEY=sk-or-... MODEL=qwen/qwen3.5-35b-a3b node test/translate.e2e.js
-//   BASE_URL=https://host/v1 API_KEY=... MODEL=... node test/translate.e2e.js
+//   CEREBRAS_API_KEY=csk-... node test/translate.e2e.js
+//   BASE_URL=https://host/v1 API_KEY=... MODEL=... THINKING=enable_thinking|reasoning_effort|openrouter node test/translate.e2e.js
 const M = require("../llm.js");
 const env = process.env;
-const provider = env.BASE_URL ? { baseUrl: env.BASE_URL, apiKey: env.API_KEY, model: env.MODEL }
-  : env.SILICONFLOW_API_KEY ? { baseUrl: "https://api.siliconflow.cn/v1", apiKey: env.SILICONFLOW_API_KEY, model: env.MODEL || "Qwen/Qwen3.5-35B-A3B" }
-  : env.OPENROUTER_API_KEY ? { baseUrl: "https://openrouter.ai/api/v1", apiKey: env.OPENROUTER_API_KEY, model: env.MODEL || "qwen/qwen3.5-35b-a3b" } : null;
-if (!provider?.apiKey) { console.log("set SILICONFLOW_API_KEY or OPENROUTER_API_KEY (or BASE_URL+API_KEY+MODEL)"); process.exit(2); }
+const provider = env.BASE_URL ? { baseUrl: env.BASE_URL, apiKey: env.API_KEY, model: env.MODEL, thinking: env.THINKING }
+  : env.SILICONFLOW_API_KEY ? { baseUrl: "https://api.siliconflow.cn/v1", apiKey: env.SILICONFLOW_API_KEY, model: env.MODEL || "Qwen/Qwen3.6-35B-A3B" }
+  : env.CEREBRAS_API_KEY ? { baseUrl: "https://api.cerebras.ai/v1", apiKey: env.CEREBRAS_API_KEY, model: env.MODEL || "qwen-3.8-27b", thinking: "reasoning_effort" }
+  : env.OPENROUTER_API_KEY ? { baseUrl: "https://openrouter.ai/api/v1", apiKey: env.OPENROUTER_API_KEY, model: env.MODEL || "google/gemini-3.1-flash-lite", thinking: "openrouter" } : null;
+if (!provider?.apiKey) { console.log("set SILICONFLOW_API_KEY, CEREBRAS_API_KEY or OPENROUTER_API_KEY (or BASE_URL+API_KEY+MODEL[+THINKING])"); process.exit(2); }
 
 const texts = [
   "Honestly this is the best take I've seen on the whole thing, [[0]] nailed it [[1]]",

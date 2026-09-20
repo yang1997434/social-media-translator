@@ -17,9 +17,9 @@ html.xrf-dark .xrf-tr-below{color:#b3adf0}
    the page for contrast: dark glass on light pages, light glass on dark pages (html.xrf-dark is set from the page's own
    background). Every property the host page could bleed in (img margins/positioning, line-height, box-sizing) is pinned. */
 .xrf-fab{position:fixed;right:0;top:50%;z-index:2147483000;box-sizing:border-box;display:flex;align-items:center;gap:9px;height:40px;margin:0;padding:0 14px 0 11px;border-radius:999px 0 0 999px;overflow:hidden;isolation:isolate;
-  background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,.05) 42%,rgba(255,255,255,0) 58%,rgba(0,0,0,.18)),rgba(4,6,10,.76);   /* piano-black: near-black base, glossy top highlight */
-  backdrop-filter:blur(18px) saturate(1.9);-webkit-backdrop-filter:blur(18px) saturate(1.9);border:1px solid rgba(255,255,255,.3);border-right:0;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.7),0 2px 8px rgba(0,0,0,.35),0 12px 32px rgba(0,0,0,.42);
+  background:linear-gradient(180deg,rgba(255,255,255,.26),rgba(255,255,255,.07) 40%,rgba(255,255,255,0) 55%,rgba(255,255,255,.06)),rgba(0,0,0,.88);   /* piano-black: black base, bright glossy top highlight, faint bottom reflection */
+  backdrop-filter:blur(18px) saturate(2);-webkit-backdrop-filter:blur(18px) saturate(2);border:1px solid rgba(255,255,255,.34);border-right:0;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 -1px 0 rgba(0,0,0,.8),0 2px 8px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.45);
   font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",system-ui,sans-serif;color:#f3f4f6;letter-spacing:0;text-align:left;cursor:pointer;user-select:none;white-space:nowrap;
   transform:translate(calc(100% - 34px),-50%);opacity:.95;transition:transform .28s cubic-bezier(.16,1,.3,1),opacity .2s,box-shadow .2s}
 .xrf-fab:hover{transform:translate(0,-50%);opacity:1;box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -1px 0 rgba(0,0,0,.7),0 4px 12px rgba(0,0,0,.4),0 16px 40px rgba(0,0,0,.5)}

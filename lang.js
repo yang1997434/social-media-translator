@@ -9,6 +9,7 @@ const XRF_LANG = (() => {
     .replace(/\[\[\d+\]\]/g, " ")
     .replace(/https?:\/\/\S+|\b[\w-]+\.(com|net|org|io|ai|co|me|dev|app|gg|xyz)(\/\S*)?/gi, " ")
     .replace(/[@#][\w一-鿿]+/g, " ")
+    .replace(/\b[ru]\/[\w-]+/g, " ")                                   // reddit r/Name, u/Name
     .replace(/[\p{Extended_Pictographic}\p{P}\p{S}\d\s]+/gu, " ");
 
   // lang: the element's lang attribute when the site provides one (X sets it on every tweet).

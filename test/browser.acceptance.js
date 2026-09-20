@@ -50,10 +50,32 @@ const base = "http://localhost:8766";
     await done();
     assert.ok(await page.evaluate(() => window.requests.length) >= 3);
     console.log("PASS X: concurrent streamed responses render immediately");
-    await page.locator(".xrf-replaced").first().hover();
-    await page.locator(".xrf-tr-toggle").first().click();
+    // Trend rows: the name span is translated, the Chinese category / count spans are left alone, the menu button untouched.
+    await page.waitForFunction(() => [...document.querySelectorAll('#trends [data-testid="trend"]')].every(t => t.querySelector(".xrf-tr")));
+    // 関 is a Japanese variant (ICU maps it to 关), so X's half-localised "関東地方 的趋势" label is translated too — harmless.
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#trends .xrf-replaced')].map(el => el.dataset.xrfTr + ":" + el.firstChild.nodeValue)), ["done:#納豆パスタ", "done:関東地方 的趋势", "done:バルコラ", "done:Fable 5.1 usage limits"]);
+    assert.equal(await page.locator('#trends button .xrf-tr, #trends [data-xrf-tr] [data-xrf-tr]').count(), 0);   // no menu button, no nested double translation
+    console.log("PASS X trends: leaf names translated, category/count/menu untouched");
+    // Tweets X already translates with Grok are left alone in both states (translated, and after 显示原文).
+    await page.waitForFunction(() => document.querySelector("#grok-orig [data-testid=tweetText]")?.dataset.xrfTr && document.querySelector("#grok-zh [data-testid=tweetText]")?.dataset.xrfTr);
+    assert.deepEqual(await page.evaluate(() => ["grok-zh", "grok-orig"].map(id => document.querySelector(`#${id} [data-testid=tweetText]`).dataset.xrfTr)), ["skip", "skip"]);
+    assert.equal(await page.locator("#grok-zh .xrf-tr, #grok-orig .xrf-tr").count(), 0);
+    assert.ok(!(await page.evaluate(() => window.requests.some(r => r.texts.some(t => /Qwen-Image-2\.1/.test(t))))), "never sent to the model");
+    console.log("PASS X Grok-translated tweets are left to X, no tokens spent, 显示原文 not undone");
+    // SPA navigation that swaps <body> (Turbo-style): new content must still be picked up without a reload.
+    await page.evaluate(() => {
+      const nb = document.createElement("body"); nb.innerHTML = '<div id="timeline"><article data-testid="tweet"><div data-testid="tweetText" lang="en"><span>Content rendered after a body swap.</span></div></article></div>';
+      document.documentElement.replaceChild(nb, document.body);
+      history.pushState({}, "", "/news");
+    });
+    await page.waitForFunction(() => document.querySelector('[data-testid="tweetText"]')?.dataset.xrfTr === "done" && document.querySelector(".xrf-tr")?.textContent.startsWith("简体译文"));
+    console.log("PASS SPA body swap + route change: new content translated without reload");
+    await page.goto(base + "/test/translate.fixture.html");
+    await done();
+    await page.locator('[data-testid="tweetText"].xrf-replaced').first().hover();
+    await page.locator('[data-testid="tweetText"] .xrf-tr-toggle').first().click();
     assert.equal(await page.locator(".xrf-show-orig").count(), 1);
-    await page.locator(".xrf-tr-toggle").first().click();
+    await page.locator('[data-testid="tweetText"] .xrf-tr-toggle').first().click();
     assert.equal(await page.locator(".xrf-show-orig").count(), 0);
     console.log("PASS original/translation toggle");
     await page.waitForFunction(() => document.querySelector('[data-testid="tweet"]:last-child [data-testid="tweetText"]')?.dataset.xrfTr === "done" && document.body.textContent.includes("Late"));
@@ -89,6 +111,23 @@ const base = "http://localhost:8766";
     console.log("PASS final repaired batch replaces an incorrect streamed preview");
     await page.goto(base + "/test/generic.fixture.html");
     assert.equal((await message({ type: "getTrStats" })).enabled, false);
+    // Side tab: present on any page, click translates, click again restores; never translated itself; hidden by the setting.
+    await page.locator(".xrf-fab").waitFor();
+    assert.equal(await page.locator(".xrf-fab-label").textContent(), "翻译此页");
+    await page.locator(".xrf-fab").hover();
+    await page.locator(".xrf-fab").click();
+    await done();
+    assert.match(await page.locator(".xrf-fab-label").textContent(), /^还原此页 · \d+ 段$/);
+    assert.equal(await page.locator(".xrf-fab .xrf-tr, .xrf-fab[data-xrf-tr]").count(), 0);
+    await page.locator(".xrf-fab").click();
+    await page.waitForFunction(() => !document.querySelector(".xrf-tr"));
+    assert.equal(await page.locator(".xrf-fab-label").textContent(), "翻译此页");
+    console.log("PASS side tab: translate / restore from the page edge, kept out of translation");
+    await page.goto(base + "/test/generic.fixture.html?fab=0");
+    await page.waitForTimeout(400);
+    assert.equal(await page.locator(".xrf-fab").count(), 0);
+    console.log("PASS side tab: hidden by the setting");
+    await page.goto(base + "/test/generic.fixture.html");
     await message({ type: "trTogglePage" });
     await page.waitForFunction(() => window.requests.length > 0);
     await message({ type: "trTogglePage" });
@@ -133,9 +172,12 @@ const base = "http://localhost:8766";
     await page.addInitScript(() => { window.slowFirst = location.search.includes("slow") ? 4000 : 0; });
     await page.goto(base + "/test/reddit-preview.fixture.html");
     await done();
-    assert.equal(await page.locator(".xrf-tr").count(), 6);
+    assert.equal(await page.locator(".xrf-tr").count(), 8);
     assert.equal(await page.locator('[slot="text-body"] .xrf-tr .xrf-tr').count(), 0);
-    console.log("PASS Reddit feed: titles, plain preview bodies and nested paragraphs");
+    // 近期帖子: the two titles are translated; r/Name, 1小时前 and 5 个赞同 are not even sent.
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("recent-posts .xrf-replaced")].map(el => el.firstChild.nodeValue)), ["How Are Others Handling Fable 5.1 Usage Limits?", "Working remotely abroad"]);
+    assert.ok(!(await page.evaluate(() => window.requests.some(r => r.texts.some(t => /^r\/|赞同|小时前/.test(t))))));
+    console.log("PASS Reddit feed: titles, plain preview bodies, nested paragraphs and the recent-posts sidebar");
     await page.goto(base + "/test/translate.fixture.html?slow=1");
     await page.waitForSelector(".xrf-tr-loading");
     assert.equal(await page.locator(".xrf-tr-loading > span").first().evaluate(el => getComputedStyle(el).opacity), "1");

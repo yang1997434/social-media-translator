@@ -27,6 +27,8 @@ for (const [t, lang, want] of [
   ["🔥🔥🔥", null, false],
   ["[[0]] nice work [[1]]", null, true],        // placeholders ignored, words remain
   ["[[0]] [[1]]", null, false],                 // placeholders only
+  ["r/ClaudeCode", null, false], ["u/someone · 1小时前", null, false],   // reddit identifiers carry no language
+  ["r/AskUK How do you mop and wash dishes?", null, true],
   ["これは日本語のツイートです", null, true],
   ["Привет, как дела?", null, true],
   ["中文 with several english words", null, true], // mostly Latin by char count

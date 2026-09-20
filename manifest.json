@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Social Media Translator",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "看 X / Reddit 时把外文帖子和评论原地变成中文，像原生中文页一样自然；同时折叠 X 评论区的推广、互动饵、跑题和 AI 套话。",
   "permissions": [
     "storage",
@@ -20,15 +20,31 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://x.com/*", "https://twitter.com/*"],
-      "js": ["rules.js", "content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "rules.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://x.com/*", "https://twitter.com/*", "https://reddit.com/*", "https://*.reddit.com/*"],
-      "js": ["lang.js", "translator.js"],
-      "css": ["translator.css"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "lang.js",
+        "translator.js"
+      ],
+      "css": [
+        "translator.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -48,5 +64,16 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "homepage_url": "https://xrf.ship2market.ai/"
+  "homepage_url": "https://xrf.ship2market.ai/",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/logo.svg"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
+    }
+  ]
 }

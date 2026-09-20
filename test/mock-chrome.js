@@ -18,7 +18,7 @@
     cerebras: { name: "Cerebras", baseUrl: "https://api.cerebras.ai/v1", model: "qwen-3.8-27b", thinking: "reasoning_effort", keyHint: "粘贴 Cerebras API Key（csk-…）", keyUrl: "https://cloud.cerebras.ai/", prices: { "qwen-3.8-27b": [0.99 * USD, 1.49 * USD] } },
     openrouter: { name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", model: "google/gemini-3.1-flash-lite", thinking: "openrouter", keyHint: "粘贴 OpenRouter API Key（sk-or-…）", keyUrl: "https://openrouter.ai/keys", prices: { "google/gemini-3.1-flash-lite": [0.25 * USD, 1.5 * USD] } },
   };
-  const DEFAULTS = { enabled: true, provider: "siliconflow", keys: {}, models: {}, mode: "replace", sites: { x: true, reddit: true }, concurrency: 3, batch: 6, priceIn: null, priceOut: null };
+  const DEFAULTS = { enabled: true, provider: "siliconflow", keys: {}, models: {}, mode: "replace", sites: { x: true, reddit: true }, fab: qs.get("fab") !== "0", concurrency: 3, batch: 6, priceIn: null, priceOut: null };
   if (qs.get("configured") !== "0") sync.mem.tr = { provider: qs.get("provider") || "siliconflow", keys: { siliconflow: "sk-mock", cerebras: "csk-mock" }, mode: qs.get("mode") || "replace" };
   local.mem.recent = [{ id: "201", t: "Great insights! Leveraging AI to unlock efficiency is truly the future of work.", h: "growthguru", reason: "AI 套话", p: 0.91, ts: 1 },
     { id: "202", t: "Honest question: does the fix apply to the CLI too?", h: "dev_amy", reason: "跑题", p: 0.76, ts: 2 }];
@@ -35,7 +35,7 @@
     "[[0]] honestly the image path was always the slow one, nice to see it fixed [[1]] more here: [[2]]": "[[0]] 说实话图片那条路径一直是最慢的，很高兴看到修好了 [[1]] 详见：[[2]]" };
   const handlers = {
     trDefaults: async () => ({ defaults: DEFAULTS, providers: PROVIDERS }),
-    trConfig: async () => { const t = await tr(); return { configured: !!t.apiKey, enabled: t.enabled !== false, sites: t.sites, mode: t.mode, concurrency: t.concurrency, batch: t.batch, provider: t.provider, providerName: t.providerName, model: t.model, price: t.price }; },
+    trConfig: async () => { const t = await tr(); return { configured: !!t.apiKey, enabled: t.enabled !== false, sites: t.sites, fab: t.fab !== false, mode: t.mode, concurrency: t.concurrency, batch: t.batch, provider: t.provider, providerName: t.providerName, model: t.model, price: t.price }; },
     getQuota: async () => ({ used: 42, limit: 300 }),
     trTest: async () => { await new Promise(r => setTimeout(r, 600)); return { ok: true, sample: "说实话这是我见过对整件事最好的解读，[[0]] 一针见血 😂", ttfbMs: 412, totalMs: 1380, tps: 96.4 }; },
     trModels: async () => ({ models: ["Qwen/Qwen3.6-35B-A3B", "Qwen/Qwen3.5-122B-A10B", "zai-org/GLM-4.5-Air", "Qwen/Qwen3.8-27B", "qwen-3.8-27b", "gpt-oss-120b"] }),
@@ -48,7 +48,7 @@
   window.__mock = { sync, local, listeners };
   window.chrome = {
     storage: { sync, local, onChanged: { addListener: fn => listeners.push(fn) } },
-    runtime: { id: "mock", getManifest: () => ({ version: "0.6.0-mock" }), openOptionsPage: () => alert("openOptionsPage()"),
+    runtime: { id: "mock", getManifest: () => ({ version: "0.6.0-mock" }), openOptionsPage: () => alert("openOptionsPage()"), getURL: p => "/" + p,
       sendMessage: async msg => { const h = handlers[msg.type]; if (!h) throw new Error("no handler " + msg.type); return h(msg); },
       onMessage: { addListener: fn => { onMessage = fn; window.__mock.onMessage = fn; } } },
     tabs: { query: async () => [{ id: 1, url: qs.get("url") || "https://x.com/thsottiaux/status/100" }],

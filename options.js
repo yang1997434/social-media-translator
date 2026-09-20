@@ -30,6 +30,7 @@ function renderTr() {
   $("tr_model").value = curModel();
   $("tr_mode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === tr.mode));
   for (const s of ["x", "reddit"]) { const cb = $("tr_site_" + s); cb.checked = tr.sites?.[s] !== false; setChip(cb); }
+  $("tr_fab").checked = tr.fab !== false; setChip($("tr_fab"));
 }
 
 // Model names autocomplete from the provider's /models, fetched quietly once a key is present.
@@ -68,6 +69,7 @@ function bindTr() {
   $("tr_test").onclick = testTr;
   $("tr_mode").querySelectorAll("button").forEach(b => b.onclick = () => { saveTr({ mode: b.dataset.v }); $("tr_mode").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); });
   for (const s of ["x", "reddit"]) $("tr_site_" + s).onchange = e => { setChip(e.target); saveTr({ sites: { [s]: e.target.checked } }); };
+  $("tr_fab").onchange = e => { setChip(e.target); saveTr({ fab: e.target.checked }); };
 }
 
 const price = () => { const p = (Number(tr.priceIn) || Number(tr.priceOut)) ? [Number(tr.priceIn) || 0, Number(tr.priceOut) || 0] : P().prices[curModel()] || [0, 0]; return { pin: p[0], pout: p[1] }; };

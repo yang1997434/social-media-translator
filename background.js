@@ -22,7 +22,7 @@ const PROVIDERS = {
   openrouter: { name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", model: "google/gemini-3.1-flash-lite", thinking: "openrouter", keyHint: "粘贴 OpenRouter API Key（sk-or-…）", keyUrl: "https://openrouter.ai/keys",
     prices: { "google/gemini-3.1-flash-lite": [0.25 * USD, 1.5 * USD], "google/gemini-3.8-flash": [0.75 * USD, 3.75 * USD], "openai/gpt-5.4-nano": [0.2 * USD, 1.25 * USD], "qwen/qwen3.6-35b-a3b": [0.1 * USD, 0.9 * USD], "deepseek/deepseek-v4-flash": [0.04 * USD, 0.07 * USD] } },
 };
-const TR_DEFAULTS = { enabled: true, provider: "siliconflow", keys: {}, models: {}, mode: "replace", sites: { x: true, reddit: true }, concurrency: 3, batch: 6, priceIn: null, priceOut: null };
+const TR_DEFAULTS = { enabled: true, provider: "siliconflow", keys: {}, models: {}, mode: "replace", sites: { x: true, reddit: true }, fab: true, concurrency: 3, batch: 6, priceIn: null, priceOut: null };
 const LEGACY_MODELS = { "Qwen/Qwen3.5-35B-A3B": PROVIDERS.siliconflow.model };
 const TR_CACHE_MAX = 2000;
 const TR_EMPTY_STATS = { day: "", today: { n: 0, in: 0, out: 0, cost: 0 }, month: "", mon: { n: 0, in: 0, out: 0, cost: 0 }, total: { n: 0, in: 0, out: 0, cost: 0 } };
@@ -245,7 +245,7 @@ async function trTest(provider) {
 
 async function trConfig() {
   const tr = await getTr();
-  return { configured: !!tr.apiKey, enabled: tr.enabled !== false, sites: tr.sites, mode: tr.mode, concurrency: tr.concurrency, batch: tr.batch,
+  return { configured: !!tr.apiKey, enabled: tr.enabled !== false, sites: tr.sites, fab: tr.fab !== false, mode: tr.mode, concurrency: tr.concurrency, batch: tr.batch,
     provider: tr.provider, providerName: PROVIDERS[tr.provider].name, model: tr.model, price: priceOf(tr) };
 }
 

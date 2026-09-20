@@ -11,20 +11,21 @@
     || (/(^|\.)(x\.com|twitter\.com)$/.test(host) ? "x" : /(^|\.)reddit\.com$/.test(host) ? "reddit" : "generic");
   const AUTO = SITE !== "generic";
   const SELECTOR = {
-    x: '[data-testid="tweetText"], [data-testid="UserDescription"]',
+    x: '[data-testid="tweetText"], [data-testid="UserDescription"], [data-testid="trend"] span',   // trend rows: only the leaf span with the name survives the innermost-only filter
+    // recent-posts (右栏「近期帖子」) is a shadow host, but its list is slotted light DOM: take the leaf text nodes inside it.
     reddit: ['h1[slot="title"]', 'a[slot="title"]', '[slot="text-body"]', 'shreddit-post-text-body', '[slot="text-body"] p', '[slot="text-body"] li', '[slot="comment"] p', '[slot="comment"] li',
-      "a.title", ".usertext-body p", ".usertext-body li"].join(", "),
+      'recent-posts [slot="posts"] :is(a, span, h1, h2, h3, p, div)', "a.title", ".usertext-body p", ".usertext-body li"].join(", "),
     generic: "p, h1, h2, h3, h4, h5, h6, li, blockquote, dd, dt, figcaption, td, th, summary, div",
   }[SITE];
   const BLOCKS = "p, div, ul, ol, li, dd, dt, figcaption, td, th, summary, table, section, article, h1, h2, h3, h4, h5, h6, blockquote, pre, form, nav, header, footer";
-  const SKIP_INSIDE = "nav, header, footer, aside, form, pre, code, script, style, noscript, textarea, button, select, [contenteditable], [aria-hidden=true], .xrf-bar, .xrf-pill, .xrf-toast";
+  const SKIP_INSIDE = "nav, header, footer, aside, form, pre, code, script, style, noscript, textarea, button, select, [contenteditable], [aria-hidden=true], .xrf-bar, .xrf-pill, .xrf-toast, .xrf-fab";
   // Inline pieces we never send to the model: they become [[n]] placeholders and are put back verbatim.
   const ATOM = "a, img, code, video, button, kbd, svg, input, select, textarea, iframe";
   const OURS = ".xrf-tr, .xrf-tr-toggle";
   let scanTimer = null;
 
   let cfg = { mode: "replace", concurrency: 3, batch: 6 };
-  let enabled = false, inflight = 0, io = null, mo = null, dead = false, generation = 0;
+  let enabled = false, inflight = 0, io = null, mo = null, dead = false, generation = 0, routeTimer = null, lastHref = "";
   const activeItems = new WeakMap();
   const queue = [];
   const pending = new Map();           // reqId -> items, for streamed partial results
@@ -37,7 +38,7 @@
   function teardown() {
     if (dead) return;
     dead = true; io?.disconnect(); mo?.disconnect();
-    clearTimeout(scanTimer);
+    clearTimeout(scanTimer); clearInterval(routeTimer);
   }
   const guard = fn => async (...a) => {
     if (!alive()) return teardown();
@@ -157,6 +158,16 @@
   }
   const current = it => enabled && it.generation === generation && it.el.isConnected && activeItems.get(it.el) === it;
 
+  // X's own Grok translation ("翻译自 英语 · 显示原文" / "Translated from English · Show original") sits next to the tweet text.
+  // Such a tweet is X's to handle in both states: it already reads Chinese, and when the user clicks 显示原文 they want the
+  // original — re-translating it would undo the click.
+  const X_OWN = /翻译自|显示原文|显示译文|显示翻译|Translated (?:from|by)|Show (?:original|translation)/;
+  function ownedBySite(el) {
+    if (SITE !== "x" || el.getAttribute("data-testid") !== "tweetText" || !el.parentElement) return false;
+    for (const sib of el.parentElement.children) if (sib !== el && X_OWN.test(sib.textContent || "")) return true;
+    return false;
+  }
+
   // ---- pipeline: observe -> queue (document order) -> batch -> background -> stream back ----
   function scan() {
     if (!enabled) return;
@@ -170,7 +181,7 @@
       const el = en.target;
       if (el.dataset.xrfTr !== "seen") continue;
       const { text, atoms } = extract(el);
-      if (!text || !XRF_LANG.shouldTranslate(text, el.getAttribute("lang"))) { el.dataset.xrfTr = "skip"; continue; }
+      if (!text || ownedBySite(el) || !XRF_LANG.shouldTranslate(text, el.getAttribute("lang"))) { el.dataset.xrfTr = "skip"; continue; }
       el.dataset.xrfTr = "queued";
       const item = { el, text, atoms, generation };
       activeItems.set(el, item);
@@ -200,6 +211,7 @@
       inflight++;
       translateBatch(batch).finally(() => { inflight--; pump(); });
     }
+    updateFab();
   }
 
   function settle(item, text, err, final = false) {
@@ -243,7 +255,7 @@
     for (const m of muts) {
       const changed = m.type === "childList" ? [...m.addedNodes, ...m.removedNodes] : [];
       const target = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-      if (target?.closest?.(OURS)) continue;                                              // inside our own nodes (toggle label etc.)
+      if (target?.closest?.(OURS + ", .xrf-fab")) continue;                                // inside our own nodes (toggle label, side tab)
       if (changed.length && changed.every(n => n.nodeType === 1 && n.matches?.(OURS))) continue; // we added/removed our own nodes
       const host = target?.closest?.("[data-xrf-tr]");
       // X sometimes reuses the same tweetText element and only changes its text node.
@@ -277,18 +289,55 @@
     detectTheme();
     io = new IntersectionObserver(onIntersect, { rootMargin: "600px 0px" });   // ~two tweets ahead: translated before they scroll in
     mo = new MutationObserver(onMutations);
-    mo.observe(document.body, { childList: true, characterData: true, subtree: true });
+    mo.observe(document.documentElement, { childList: true, characterData: true, subtree: true });
+    // Route changes (Reddit sidebar, X tabs) as a second trigger in case the swap happened outside what we observed.
+    lastHref = location.href;
+    routeTimer = setInterval(() => { if (!alive()) return teardown(); if (location.href !== lastHref) { lastHref = location.href; scheduleScan(); } }, 800);
     scan();
+    updateFab();
   }
 
   function stop() {
     enabled = false;
-    clearTimeout(scanTimer);
-    scanTimer = null;
+    clearTimeout(scanTimer); clearInterval(routeTimer);
+    scanTimer = null; routeTimer = null;
     generation++;
     io?.disconnect(); mo?.disconnect(); io = mo = null;
     queue.length = 0; pending.clear(); watchdogs.clear();
     document.querySelectorAll("[data-xrf-tr]").forEach(reset);
+    updateFab();
+  }
+
+  // ---- side tab: a logo peeking from the right edge of every page; hover slides it out, click translates / restores ----
+  let fab = null;
+  function ensureFab(show) {
+    if (!show) { fab?.remove(); fab = null; return; }
+    if (fab?.isConnected) return updateFab();
+    fab = document.createElement("div");
+    fab.className = "xrf-fab"; fab.setAttribute("role", "button"); fab.setAttribute("aria-label", "翻译此页");
+    fab.innerHTML = `<img alt="" src="${chrome.runtime.getURL("icons/logo.svg")}"><span class="xrf-fab-label"></span>`;
+    fab.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); togglePage(); });
+    (document.body || document.documentElement).appendChild(fab);
+    detectTheme(); updateFab();
+  }
+  function updateFab() {
+    if (!fab) return;
+    const busy = enabled && (inflight > 0 || queue.length > 0);
+    fab.classList.toggle("on", enabled); fab.classList.toggle("busy", busy);
+    fab.querySelector(".xrf-fab-label").textContent = enabled ? (busy ? `翻译中 · ${stats.translated}` : `还原此页 · ${stats.translated} 段`) : "翻译此页";
+  }
+  // Same toggle for the popup button and the side tab: restores when running, otherwise starts (and flips the global
+  // switch back on if it was off). No key yet → open the options page.
+  async function togglePage() {
+    if (enabled) { stop(); return { enabled: false }; }
+    const configured = await applyConfig();
+    if (configured === false) { chrome.runtime.sendMessage({ type: "openOptions" }).catch(() => {}); return { enabled: false, configured: false }; }
+    if (configured) {
+      const { tr = {} } = await chrome.storage.sync.get({ tr: {} });
+      if (tr.enabled === false) await chrome.storage.sync.set({ tr: { ...tr, enabled: true } });
+      start();
+    }
+    return { enabled, configured };
   }
 
   const applyConfig = guard(async function applyConfigImpl() {
@@ -300,24 +349,14 @@
     if (want && !enabled) start();
     else if (!want && enabled) stop();
     else if (want && modeChanged) { stop(); start(); }   // re-render from cache in the new mode
+    ensureFab(c.fab !== false);
     return c.configured;
   });
 
   chrome.runtime.onMessage.addListener((msg, _s, sendResponse) => {
     if (msg.type === "getTrStats") sendResponse({ enabled, site: SITE, translated: stats.translated, failed: stats.failed, lastError: stats.lastError,
       pending: queue.filter(current).length + [...pending.values()].flat().filter(it => current(it) && it.status === "waiting").length });
-    else if (msg.type === "trTogglePage") {
-      if (enabled) { stop(); sendResponse({ enabled: false }); }
-      else applyConfig().then(async configured => {
-        if (configured) {
-          const { tr = {} } = await chrome.storage.sync.get({ tr: {} });
-          if (tr.enabled === false) await chrome.storage.sync.set({ tr: { ...tr, enabled: true } });
-          start();
-        }
-        sendResponse({ enabled, configured });
-      });
-      return true;
-    }
+    else if (msg.type === "trTogglePage") { togglePage().then(sendResponse); return true; }
     else if (msg.type === "trPartial") {
       watchdogs.get(msg.reqId)?.();
       const item = pending.get(msg.reqId)?.[msg.index];

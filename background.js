@@ -8,13 +8,8 @@ const DEFAULTS = { apiKey: "", threshold: 0.75, proxyUrl: "https://xrf.ship2mark
   categories: { spam: true, bait: true, offtopic: true, slop: true } };
 const EMPTY_STATS = { calls: 0, replies: 0, input_tokens: 0, output_tokens: 0, cost: 0 };
 
-const TR_PRESETS = {
-  siliconflow: { baseUrl: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen3.5-35B-A3B" },
-  openrouter: { baseUrl: "https://openrouter.ai/api/v1", model: "qwen/qwen3.5-35b-a3b" },
-  custom: { baseUrl: "", model: "" },
-};
-const TR_DEFAULTS = { enabled: true, preset: "siliconflow", baseUrl: TR_PRESETS.siliconflow.baseUrl, apiKey: "", model: TR_PRESETS.siliconflow.model,
-  mode: "replace", sites: { x: true, reddit: true }, concurrency: 3, batch: 6, priceIn: 0, priceOut: 0 };
+const TR_DEFAULTS = { enabled: true, baseUrl: "https://api.siliconflow.cn/v1", apiKey: "", model: "Qwen/Qwen3.5-35B-A3B",
+  mode: "replace", sites: { x: true, reddit: true }, concurrency: 3, batch: 6 };
 const TR_CACHE_MAX = 2000;
 const TR_EMPTY_STATS = { day: "", today: { n: 0, in: 0, out: 0 }, total: { n: 0, in: 0, out: 0 } };
 
@@ -24,7 +19,7 @@ async function getSettings() {
 }
 async function getTr() {
   const { tr } = await chrome.storage.sync.get({ tr: {} });
-  return { ...TR_DEFAULTS, ...tr, sites: { ...TR_DEFAULTS.sites, ...(tr?.sites || {}) } };
+  return { ...TR_DEFAULTS, ...tr, baseUrl: TR_DEFAULTS.baseUrl, sites: { ...TR_DEFAULTS.sites, ...(tr?.sites || {}) } };
 }
 
 // chrome.storage has no transactions: concurrent read-modify-write of stats/cache would drop updates. Serialize them.
@@ -150,7 +145,7 @@ async function trTest(provider) {
 
 async function trConfig() {
   const tr = await getTr();
-  return { configured: !!tr.apiKey, enabled: tr.enabled !== false, sites: tr.sites, mode: tr.mode, concurrency: tr.concurrency, batch: tr.batch, model: tr.model, preset: tr.preset };
+  return { configured: !!tr.apiKey, enabled: tr.enabled !== false, sites: tr.sites, mode: tr.mode, concurrency: tr.concurrency, batch: tr.batch, model: tr.model };
 }
 
 function setBadge(tabId, n) {
@@ -169,7 +164,7 @@ const HANDLERS = {
     return translate(msg.texts || [], notify);
   },
   trConfig: () => trConfig(),
-  trPresets: () => Promise.resolve({ presets: TR_PRESETS, defaults: TR_DEFAULTS }),
+  trDefaults: () => Promise.resolve({ defaults: TR_DEFAULTS }),
   trTest: msg => trTest(msg.provider),
   trModels: msg => XRF_LLM.listModels(msg.provider).then(models => ({ models }), e => ({ error: e.message })),
   trClearCache: () => serialize(() => chrome.storage.local.remove("tcache")).then(() => ({ ok: true })),

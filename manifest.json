@@ -11,10 +11,6 @@
     "https://xrf.ship2market.ai/*",
     "https://api.siliconflow.cn/*"
   ],
-  "optional_host_permissions": [
-    "https://*/*",
-    "http://*/*"
-  ],
   "background": {
     "service_worker": "background.js"
   },

@@ -1,91 +1,44 @@
 <!doctype html><html lang="zh"><head><meta charset="utf-8"><title>X 助手 · 设置</title><link rel="stylesheet" href="ui.css">
 <style>
-body{padding:28px 16px 60px}.wrap{max-width:680px;margin:0 auto}
-.hero{display:flex;align-items:center;gap:14px;margin-bottom:18px}.hero h1{font-size:22px;margin:0;line-height:1.2}.hero .sub{color:var(--muted);font-size:13px}
-.hero .ico{width:44px;height:44px;border-radius:12px;font-size:20px}
-.nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}.nav a{padding:5px 12px;border-radius:999px;font-size:13px;color:var(--muted);background:var(--card);box-shadow:var(--shadow)}.nav a:hover{color:var(--text);text-decoration:none}
-h2{font-size:16px;margin:0}.sec{margin-top:16px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:560px){.grid2{grid-template-columns:1fr}}
-.steps{margin:10px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}.steps li{margin:3px 0}
-.kbd{font-family:ui-monospace,monospace;font-size:12px;padding:1px 5px;border-radius:5px;background:rgba(128,128,128,.14)}
-.range-row{display:flex;align-items:center;gap:12px}.range-row output{font-variant-numeric:tabular-nums;min-width:38px;text-align:right;font-weight:600}
-.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+body{padding:32px 16px 60px}.wrap{max-width:560px;margin:0 auto}
+.hero{display:flex;align-items:center;gap:12px;margin-bottom:16px}.hero h1{font-size:20px;margin:0;line-height:1.2}.hero .sub{color:var(--muted);font-size:12px}
+h2{font-size:15px;margin:0}
+.row{display:flex;align-items:center;gap:12px;margin-top:14px}.row>label{flex:none;width:64px;font-size:13px;color:var(--muted)}.row>.ctl{flex:1;min-width:0;display:flex;gap:8px;align-items:center}.row>.ctl>input{flex:1}
+.range-row{display:flex;align-items:center;gap:12px;flex:1}.range-row output{font-variant-numeric:tabular-nums;min-width:34px;text-align:right;font-weight:600;font-size:13px}
+.foot{margin-top:14px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.result{margin:10px 0 0 76px;padding:6px 10px}
+.chip .x{margin-left:2px;opacity:.6}.chip:hover .x{opacity:1}
+.sub-h{margin-top:14px;font-size:12px;font-weight:600;color:var(--muted)}
 </style></head><body><div class="wrap">
 
-<div class="hero"><div class="ico f">X</div><div><h1>X 助手</h1><div class="sub">自动翻译 · 评论过滤 · 改动即时保存</div></div></div>
-<div class="nav"><a href="#translate">翻译</a><a href="#filter">评论过滤</a><a href="#learn">教 AI 口味</a><a href="#stats">统计</a></div>
+<div class="hero"><div class="ico f" style="width:40px;height:40px;border-radius:11px;font-size:18px">X</div><div><h1>X 助手</h1><div class="sub">改动即时保存</div></div></div>
 
-<!-- ============ 翻译 ============ -->
-<section class="card sec" id="translate">
-  <div class="card-head"><span class="ico tr">译</span><div class="grow"><h2>自动翻译</h2><div class="muted small">看 X / Reddit 时，把外文帖子和评论原地变成中文，像原生中文页面一样自然</div></div>
+<section class="card" id="translate">
+  <div class="card-head"><span class="ico tr">译</span><div class="grow"><h2>自动翻译</h2><div class="muted small">X / Reddit 上的外文原地变成中文</div></div>
     <label class="switch tr"><input type="checkbox" id="tr_enabled"><span></span></label></div>
-
-  <div class="field"><label>翻译服务</label>
-    <div class="seg" id="tr_preset"><button data-v="siliconflow">硅基流动</button><button data-v="openrouter">OpenRouter</button><button data-v="custom">自定义</button></div></div>
-  <div class="grid2">
-    <div class="field"><label>Base URL</label><input type="url" id="tr_baseUrl" placeholder="https://api.example.com/v1"><div class="hint" id="tr_urlHint"></div></div>
-    <div class="field"><label>API Key</label><div class="inline"><input type="password" id="tr_apiKey" placeholder="sk-…" autocomplete="off"><button class="ghost sm" id="tr_eye" type="button">显示</button></div><div class="hint" id="tr_keyHint">在 <a id="tr_keyLink" target="_blank"></a> 获取</div></div>
-  </div>
-  <div class="field"><label>模型</label>
-    <div class="inline"><input type="text" id="tr_model" list="tr_models" placeholder="Qwen/Qwen3.5-35B-A3B" autocomplete="off"><button class="ghost sm" id="tr_listModels" type="button">获取模型列表</button></div>
-    <datalist id="tr_models"></datalist>
-    <div class="hint">推荐快而便宜的小模型，例如 <span class="kbd">Qwen/Qwen3.5-35B-A3B</span>。点「获取模型列表」后输入框会有补全。</div></div>
-  <div class="btns"><button class="tr" id="tr_test" type="button">测试连接</button><span class="muted small" style="align-self:center" id="tr_permNote"></span></div>
+  <div class="row"><label>API Key</label><div class="ctl"><input type="password" id="tr_apiKey" placeholder="粘贴硅基流动 API Key" autocomplete="off"><button class="tr sm" id="tr_test" type="button">测试</button></div></div>
+  <div class="row"><label>模型</label><div class="ctl"><input type="text" id="tr_model" list="tr_models" autocomplete="off"><datalist id="tr_models"></datalist></div></div>
+  <div class="row"><label>显示</label><div class="ctl"><div class="seg" id="tr_mode"><button data-v="replace">原地替换</button><button data-v="bilingual">双语对照</button></div></div></div>
+  <div class="row"><label>站点</label><div class="ctl chips"><label class="chip"><input type="checkbox" id="tr_site_x">X</label><label class="chip"><input type="checkbox" id="tr_site_reddit">Reddit</label></div></div>
   <div class="result" id="tr_result"></div>
-
-  <div class="field"><label>显示方式</label>
-    <div class="radio" id="tr_mode">
-      <label data-v="replace"><input type="radio" name="tr_mode" value="replace"><span class="t">原地替换（推荐）</span><span class="d">译文直接出现在原文位置，字体字号都一样；鼠标悬停可切回原文</span></label>
-      <label data-v="bilingual"><input type="radio" name="tr_mode" value="bilingual"><span class="t">双语对照</span><span class="d">原文保留，译文用紫色显示在下方</span></label>
-    </div></div>
-  <div class="field"><label>生效站点</label>
-    <div class="chips"><label class="chip"><input type="checkbox" id="tr_site_x">X / Twitter</label><label class="chip"><input type="checkbox" id="tr_site_reddit">Reddit</label></div>
-    <div class="hint">只翻译识别为非中文的段落；滚动到视口才请求，不会整页乱翻；译文本地缓存，刷新不重复扣费。</div></div>
-
-  <details class="adv"><summary>高级</summary>
-    <div class="grid2">
-      <div class="field"><label>并发请求数</label><input type="number" id="tr_concurrency" min="1" max="8" step="1"><div class="hint">同时发出的请求数，限速就调小</div></div>
-      <div class="field"><label>每批段落数</label><input type="number" id="tr_batch" min="1" max="20" step="1"><div class="hint">一次请求翻几段，越小首屏越快</div></div>
-      <div class="field"><label>输入单价（元 / 百万 tokens）</label><input type="number" id="tr_priceIn" min="0" step="0.1"><div class="hint">可选，用于估算费用</div></div>
-      <div class="field"><label>输出单价（元 / 百万 tokens）</label><input type="number" id="tr_priceOut" min="0" step="0.1"></div>
-    </div>
-    <div class="btns"><button class="danger sm" id="tr_clearCache" type="button">清空翻译缓存</button></div>
-  </details>
+  <div class="foot" id="tr_foot"></div>
 </section>
 
-<!-- ============ 评论过滤 ============ -->
-<section class="card sec" id="filter">
-  <div class="card-head"><span class="ico f">滤</span><div class="grow"><h2>评论过滤</h2><div class="muted small">推文详情页里，折叠推广、互动饵、跑题、AI 套话类回复；折叠成一行灰条，点一下展开，不删任何内容</div></div>
+<section class="card" id="filter">
+  <div class="card-head"><span class="ico f">滤</span><div class="grow"><h2>评论过滤</h2><div class="muted small">推文详情页折叠低质量回复，点一下展开</div></div>
     <label class="switch"><input type="checkbox" id="f_enabled"><span></span></label></div>
-  <div class="field"><label>判定服务</label><div id="f_mode" class="small muted"></div></div>
-  <div class="field"><label>OpenRouter API Key（可选）</label><div class="inline"><input type="password" id="f_apiKey" placeholder="留空 = 免费额度，每天 300 条" autocomplete="off"><button class="ghost sm" id="f_eye" type="button">显示</button></div>
-    <div class="hint">填了就直连 OpenRouter 的 TypeSafe jev，不限量、自己付费（约 1 万条回复 $0.08）</div></div>
-  <div class="field"><label>折叠阈值</label><div class="range-row"><input type="range" id="f_threshold" min="0.5" max="0.95" step="0.05"><output id="f_thresholdOut"></output></div><div class="hint">AI 判定概率 ≥ 此值才折叠；调低更激进，调高更保守</div></div>
-  <div class="field"><label>折叠哪些类别</label>
-    <div class="chips"><label class="chip"><input type="checkbox" id="c_spam">推广 / 垃圾</label><label class="chip"><input type="checkbox" id="c_bait">互动饵</label><label class="chip"><input type="checkbox" id="c_offtopic">跑题</label><label class="chip"><input type="checkbox" id="c_slop">AI 套话</label></div></div>
-  <div class="grid2">
-    <div class="field"><label>自定义关键词（一行一个）</label><textarea id="f_keywords" rows="4" placeholder="giveaway&#10;/reset.*pls/i"></textarea><div class="hint">支持正则 <span class="kbd">/…/i</span>，本地零成本匹配</div></div>
-    <div class="field"><label>屏蔽用户（一行一个）</label><textarea id="f_handles" rows="4" placeholder="spammer123"></textarea><div class="hint">@ 可省略</div></div>
-  </div>
+  <div class="row"><label>折叠</label><div class="ctl chips"><label class="chip"><input type="checkbox" id="c_spam">推广 / 垃圾</label><label class="chip"><input type="checkbox" id="c_bait">互动饵</label><label class="chip"><input type="checkbox" id="c_offtopic">跑题</label><label class="chip"><input type="checkbox" id="c_slop">AI 套话</label></div></div>
+  <div class="row"><label>阈值</label><div class="ctl"><div class="range-row"><input type="range" id="f_threshold" min="0.5" max="0.95" step="0.05"><output id="f_thresholdOut"></output></div></div></div>
+  <div class="row" id="f_blockedRow" hidden><label>已屏蔽</label><div class="ctl chips" id="f_blocked"></div></div>
+  <div class="foot" id="f_foot"></div>
 </section>
 
-<!-- ============ 学习 ============ -->
-<section class="card sec" id="learn">
-  <div class="card-head"><span class="ico learn">学</span><div class="grow"><h2>教 AI 你的口味</h2><div class="muted small">在推文页悬停回复点「隐藏」、在折叠条上点「误判」，或在下面确认，AI 会参考这些例子判断新回复</div></div></div>
-  <div class="field"><label>最近自动隐藏 · 待你确认</label><div class="hint">点「对，不想看」变成例子；点「判错了，保留」则以后不再折叠它。不确认的不影响 AI。</div><div class="list" id="recent"></div></div>
-  <div class="field"><label>已记住的例子 <span class="muted" id="exCount"></span></label><div class="list" id="examples"></div>
-    <div class="btns"><button class="danger sm" id="clearExamples" type="button">清空全部例子</button></div></div>
+<section class="card" id="learn" hidden>
+  <div class="card-head"><span class="ico learn">学</span><div class="grow"><h2>教 AI 你的口味</h2><div class="muted small">确认过的回复会成为 AI 判断新回复的参考</div></div></div>
+  <div id="recentWrap"><div class="sub-h">最近自动隐藏 · 待确认</div><div class="list" id="recent"></div></div>
+  <div id="examplesWrap"><div class="sub-h">已记住的例子</div><div class="list" id="examples"></div></div>
 </section>
 
-<!-- ============ 统计 ============ -->
-<section class="card sec" id="stats">
-  <div class="card-head"><span class="ico stat">#</span><div class="grow"><h2>统计</h2></div></div>
-  <div class="field"><label>翻译</label><div class="stat-grid" id="tr_stats"></div></div>
-  <div class="field"><label>评论过滤</label><div class="stat-grid" id="f_stats"></div></div>
-  <div class="btns"><button class="ghost sm" id="export" type="button">导出调用日志（jevlog）</button><button class="danger sm" id="clearVerdicts" type="button">清空判定缓存</button></div>
-</section>
-
-<p class="muted small" style="margin-top:20px">API Key 存在 <span class="kbd">chrome.storage.sync</span>（随 Chrome 账号同步）；例子、缓存只在本机。翻译时发出去的只有段落文本，不含账号信息。</p>
 </div>
 <div class="toast" id="toast">已保存</div>
 <script src="options.js"></script></body></html>

@@ -42,6 +42,8 @@ Chrome 扩展，MV3，无构建步骤，自带 Key（硅基流动 / Cerebras / O
 | 拿 Key | [cloud.siliconflow.cn](https://cloud.siliconflow.cn/account/ak) | [cloud.cerebras.ai](https://cloud.cerebras.ai)（免费层 5 次/分钟不够用，需付费层） | [openrouter.ai/keys](https://openrouter.ai/keys) |
 | 适合 | 国内直连、便宜省心 | 要最快最丝滑，译文也最地道（1850 tok/s 专用芯片） | 想试任何模型、或前两家都不通时兜底 |
 
+<p align="center"><img src="docs/speed.png" width="640" alt="6 条推文翻完要多久：Cerebras 0.53s，硅基流动 1.3s，OpenRouter 1.5s，Gemini 3.8 Flash 2.7s，旧默认 Qwen3.5-35B 经常超时"></p>
+
 > 数字是 2026-09 从日本家宽实测（同一批 6 条推文，各 6–12 轮，思考全部关闭）。为什么不是 Gemini 3.8 Flash / GPT / DeepSeek？Gemini 3 强制思考、首字节 1.6 秒且译文不如 Qwen；OpenRouter 每多一跳约 +1 秒；Groq / SambaNova 上的 gpt-oss、DeepSeek 要么强制思考要么中文一般。硅基流动上旧默认的 `Qwen3.5-35B-A3B` 约 30% 请求无响应，已自动迁移到 3.6。完整对比见下文。
 
 <p align="center"><img src="docs/options.png" width="560" alt="设置页：服务商切换、Key、模型、显示方式、站点、浮标"></p>

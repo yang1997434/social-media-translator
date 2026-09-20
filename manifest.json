@@ -7,7 +7,7 @@
     "storage"
   ],
   "host_permissions": [
-    "https://openrouter.ai/*",
+    "https://api.typesafe.ai/*",
     "https://xrf.ship2market.ai/*",
     "https://api.siliconflow.cn/*"
   ],

@@ -34,7 +34,7 @@ async function renderFilter(tab) {
   $("fEnabled").checked = enabled;
   $("fCard").classList.toggle("off", !enabled);
   const q = apiKey ? null : await chrome.runtime.sendMessage({ type: "getQuota" }).catch(() => null);
-  $("fSub").textContent = apiKey ? "自带 key · 不限量" : q?.limit ? `免费额度 · 今日 ${q.used} / ${q.limit}` : "免费额度 · 每天 300 条";
+  $("fSub").textContent = apiKey ? "TypeSafe 直连 · 不限量" : q?.limit ? `免费额度 · 今日 ${q.used} / ${q.limit}` : "免费额度 · 每天 300 条";
   const body = $("fBody");
   if (!isStatus(tab?.url)) { body.innerHTML = `<div class="line">打开一条推文的详情页，评论区会自动折叠推广、互动饵、跑题和 AI 套话。</div>`; return; }
   if (!enabled) { body.innerHTML = `<div class="line">已关闭。</div>`; return; }

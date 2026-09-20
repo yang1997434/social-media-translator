@@ -43,7 +43,7 @@ Chrome 扩展（MV3，无构建步骤）。两件事：
 ### 两种模式
 
 - **免费额度（默认）**：不填 key。另有每 IP 每天 600 条的上限（安装 id 是客户端生成的，可以随便换，IP 上限才是真正防一个人刷爆公共预算的闸）。插件调 Cloudflare Worker 中转（`worker/`），key 只存在 Worker secret 里。每个安装生成匿名 id，每天 300 条回复；全局日预算 $2，超了返回 429，插件自动退回纯规则模式。
-- **自带 key**：设置页「jev Key」填 OpenRouter key，直连 OpenRouter，不限量、自己付费。
+- **自带 key**：设置页「jev Key」填 TypeSafe 官方 key（[console.typesafe.ai/keys](https://console.typesafe.ai/keys)），直连 `api.typesafe.ai/v1/systemone`，不限量、自己付费，回复内容不经任何第三方。「测试」按钮会发一条样例回复确认 key 可用
 
 中转部署（一次性）：
 
@@ -54,9 +54,9 @@ OPENROUTER_API_KEY=sk-or-... ./deploy.sh   # 建 KV、写 secret、部署、自�
 
 额度和预算在 `worker/wrangler.jsonc` 的 `vars` 里改。
 
-### 前置：OpenRouter Guardrail
+### 前置：OpenRouter Guardrail（仅免费中转）
 
-如果设置页统计一直为 0、控制台出现 `model-ignored-by-guardrail`，说明 OpenRouter 工作区的 Guardrail 把 `typesafe/jev` 挡了，去 https://openrouter.ai/workspaces/default/guardrails 放行。2026-09-18 这把 key 就是这个状态。
+自建中转时如果统计一直为 0、控制台出现 `model-ignored-by-guardrail`，说明 OpenRouter 工作区的 Guardrail 把 `typesafe/jev` 挡了，去 https://openrouter.ai/workspaces/default/guardrails 放行。直连 TypeSafe 不涉及。
 
 ### 费用
 
@@ -69,8 +69,8 @@ node test/rules.test.js                                   # 本地规则 + 自�
 node test/translate.test.js                               # 语言识别 + 模型输出解析 + 占位符
 node test/sw.load.test.js                                 # service worker 同作用域加载（防重复声明）
 SILICONFLOW_API_KEY=sk-... node test/translate.e2e.js     # 真实调用：译成中文、占位符保留、流式解析
-OPENROUTER_API_KEY=sk-or-... node test/examples.e2e.js    # 用户样本确实改变 jev 判定
-OPENROUTER_API_KEY=sk-or-... node test/jev.e2e.js         # 直连 jev，5 条样例带期望值
+OPENROUTER_API_KEY=sk-or-... node test/examples.e2e.js    # 用户样本确实改变 jev 判定（走 OpenRouter）
+TYPESAFE_API_KEY=... node test/jev.e2e.js                 # 直连 TypeSafe jev，5 条样例带期望值
 cd worker && npx wrangler dev --port 8787 --var DAILY_PER_ID:10 & PROXY_URL=http://localhost:8787 node test/jev.e2e.js   # 走中转，第 3 次应 429
 python3 -m http.server 8766
 open http://localhost:8766/test/fixture.html              # 仿 X DOM + mock chrome，看折叠 UI
@@ -82,7 +82,7 @@ open http://localhost:8766/test/ui.fixture.html           # 真实 popup.html / 
 
 - **翻译**：只发段落文本（链接、@ 已换成占位符）到你填的接口；API Key 存 `chrome.storage.sync`；译文缓存在本机
 - **评论过滤发出去的数据**：原推文正文与作者名、待判定回复的正文与作者名、你确认过的例子文本（各最多 10 条）。不含你的账号、cookie、私信或浏览历史
-- **去向**：免费模式经 `xrf.ship2market.ai`（Cloudflare Worker）转发到 OpenRouter 的 TypeSafe jev；自带 key 模式直连 OpenRouter
+- **去向**：免费模式经 `xrf.ship2market.ai`（Cloudflare Worker）转发到 OpenRouter 的 TypeSafe jev；自带 key 模式直连 TypeSafe 官方 API
 - **中转只存计数**：每个匿名安装 id 和哈希后的 IP 的当日用量、当日总花费，26 小时过期；不存任何推文或回复内容
 - **本机**：例子、判定缓存、待确认列表都在 `chrome.storage.local`；关键词、屏蔽用户、key 在 `chrome.storage.sync`
 - 不想经过别人的中转？自己部署 `worker/`，把 `background.js` 里的 `proxyUrl` 改成你的域名即可

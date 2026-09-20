@@ -34,6 +34,7 @@
     trTest: async () => { await new Promise(r => setTimeout(r, 600)); return { ok: true, sample: "说实话这是我见过对整件事最好的解读，[[0]] 一针见血 😂", ttfbMs: 412, totalMs: 1380, tps: 96.4 }; },
     trModels: async () => ({ models: ["Qwen/Qwen3.5-35B-A3B", "Qwen/Qwen3-8B", "deepseek-ai/DeepSeek-V3", "THUDM/GLM-4-9B-0414"] }),
     trClearCache: async () => ({ ok: true }),
+    jevTest: async () => { await new Promise(r => setTimeout(r, 500)); return { ok: true, ms: 640, model: "jev-1.13.0", spam: 0.97, usage: { input_tokens: 310, output_tokens: 20 } }; },
     openOptions: async () => ({ ok: true }), count: async () => ({ ok: true }),
     translate: async msg => { await new Promise(r => setTimeout(r, 300)); return { translations: msg.texts.map(t => CANNED[t] || "（译）" + t) }; },
   };

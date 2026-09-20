@@ -1,8 +1,10 @@
 // Shared between the extension service worker (importScripts) and the Cloudflare Worker (import).
 // Wrapped in an IIFE: importScripts() shares one global scope, so nothing here may leak as a global name.
 (() => {
-const JEV_MODEL = "~typesafe/jev-latest";
-const JEV_ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
+// Same wire format on both: { model, state, questions } -> { answers, usage }. TypeSafe direct is what the extension uses
+// with the user's own key; OpenRouter is what the free proxy (worker/) uses.
+const JEV_TYPESAFE = { endpoint: "https://api.typesafe.ai/v1/systemone", model: "jev-latest" };
+const JEV_OPENROUTER = { endpoint: "https://openrouter.ai/api/alpha/decisions", model: "~typesafe/jev-latest" };
 const QUESTION_DEFS = {
   spam: ["Is this reply promotional spam, a scam, or shilling a product/crypto/AI tool?", "Promo, scam, shill or link-farming", "Genuine comment"],
   bait: ["Is this reply low-effort engagement bait (generic agreement, emoji-only, 'first', copy-paste reaction)?", "Low-effort bait", "Substantive reply"],
@@ -58,16 +60,16 @@ function verdicts(answers, n, threshold) {
   });
 }
 
-async function callJev(apiKey, original, replies, categories, examples, fetchImpl = fetch) {
-  const body = { model: JEV_MODEL, state: buildState(original, replies, examples), questions: buildQuestions(replies, categories, examples) };
-  const res = await fetchImpl(JEV_ENDPOINT, { method: "POST",
+async function callJev(apiKey, original, replies, categories, examples, fetchImpl = fetch, target = JEV_OPENROUTER) {
+  const body = { model: target.model, state: buildState(original, replies, examples), questions: buildQuestions(replies, categories, examples) };
+  const res = await fetchImpl(target.endpoint, { method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "X-OpenRouter-Title": "x-reply-filter" },
     body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`jev ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json();
 }
 
-const JEV_SHARED = { QUESTION_DEFS, MAX_REPLIES, MAX_EXAMPLES, sanitizeExamples, buildState, buildQuestions, verdicts, callJev };
+const JEV_SHARED = { QUESTION_DEFS, MAX_REPLIES, MAX_EXAMPLES, JEV_TYPESAFE, JEV_OPENROUTER, sanitizeExamples, buildState, buildQuestions, verdicts, callJev };
 if (typeof module !== "undefined") module.exports = JEV_SHARED;
 globalThis.JEV_SHARED = JEV_SHARED;
 })();

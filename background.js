@@ -2,7 +2,7 @@
 //  1. reply classification: free proxy (default) or direct OpenRouter jev (BYO key)
 //  2. translation: any OpenAI-compatible endpoint (SiliconFlow by default), streamed back to the tab paragraph by paragraph
 importScripts("shared.js", "llm.js");
-const { verdicts, callJev } = JEV_SHARED;
+const { verdicts, callJev, JEV_TYPESAFE } = JEV_SHARED;
 
 const DEFAULTS = { apiKey: "", threshold: 0.75, proxyUrl: "https://xrf.ship2market.ai",
   categories: { spam: true, bait: true, offtopic: true, slop: true } };
@@ -63,7 +63,7 @@ async function classify(msg) {
   const settings = await getSettings();
   const examples = await getExamples();
   const resp = settings.apiKey
-    ? await callJev(settings.apiKey, msg.original, msg.replies, settings.categories, examples)
+    ? await callJev(settings.apiKey, msg.original, msg.replies, settings.categories, examples, fetch, JEV_TYPESAFE)
     : await viaProxy(settings, msg.original, msg.replies, examples);
   await recordUsage(resp.usage, msg.replies.length);
   return { verdicts: verdicts(resp.answers || {}, msg.replies.length, settings.threshold), mode: settings.apiKey ? "byok" : "proxy" };
@@ -148,6 +148,17 @@ async function trConfig() {
   return { configured: !!tr.apiKey, enabled: tr.enabled !== false, sites: tr.sites, mode: tr.mode, concurrency: tr.concurrency, batch: tr.batch, model: tr.model };
 }
 
+// One tiny real call so the options page can confirm the key before the user goes browsing.
+async function jevTest(apiKey) {
+  const t0 = Date.now();
+  try {
+    const resp = await callJev(apiKey, { handle: "op", text: "Shipped the fix for image compaction in long sessions." },
+      [{ handle: "shill", text: "Our AI trading bot made 40% this week, join the waitlist 👉", verified: false }], undefined, undefined, fetch, JEV_TYPESAFE);
+    const p = resp.answers?.r0_spam?.noul;
+    return { ok: true, ms: Date.now() - t0, model: resp.model, spam: p, usage: resp.usage };
+  } catch (e) { return { ok: false, error: e.message, ms: Date.now() - t0 }; }
+}
+
 function setBadge(tabId, n) {
   chrome.action.setBadgeBackgroundColor({ color: "#1d9bf0", tabId });
   chrome.action.setBadgeText({ text: n > 0 ? String(n) : "", tabId });
@@ -168,6 +179,7 @@ const HANDLERS = {
   trTest: msg => trTest(msg.provider),
   trModels: msg => XRF_LLM.listModels(msg.provider).then(models => ({ models }), e => ({ error: e.message })),
   trClearCache: () => serialize(() => chrome.storage.local.remove("tcache")).then(() => ({ ok: true })),
+  jevTest: msg => jevTest(msg.apiKey),
 };
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

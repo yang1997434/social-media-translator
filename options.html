@@ -30,7 +30,8 @@ h2{font-size:15px;margin:0}
     <label class="switch"><input type="checkbox" id="f_enabled"><span></span></label></div>
   <div class="row"><label>折叠</label><div class="ctl chips"><label class="chip"><input type="checkbox" id="c_spam">推广 / 垃圾</label><label class="chip"><input type="checkbox" id="c_bait">互动饵</label><label class="chip"><input type="checkbox" id="c_offtopic">跑题</label><label class="chip"><input type="checkbox" id="c_slop">AI 套话</label></div></div>
   <div class="row"><label>阈值</label><div class="ctl"><div class="range-row"><input type="range" id="f_threshold" min="0.5" max="0.95" step="0.05"><output id="f_thresholdOut"></output></div></div></div>
-  <div class="row"><label>jev Key</label><div class="ctl"><input type="password" id="f_apiKey" placeholder="sk-or-…  填了直连 OpenRouter、不限量；留空用原作者中转，每天 300 条" autocomplete="off"></div></div>
+  <div class="row"><label>jev Key</label><div class="ctl"><input type="password" id="f_apiKey" placeholder="TypeSafe 官方 key，直连不限量；留空用原作者中转，每天 300 条" autocomplete="off"><button class="sm" id="f_test" type="button">测试</button></div></div>
+  <div class="result" id="f_result"></div>
   <div class="row" id="f_blockedRow" hidden><label>已屏蔽</label><div class="ctl chips" id="f_blocked"></div></div>
   <div class="foot" id="f_foot"></div>
 </section>

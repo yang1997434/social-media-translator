@@ -7,7 +7,7 @@ const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = se
 const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e4 ? (n / 1e3).toFixed(1) + "k" : String(n);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const setChip = cb => cb.closest(".chip").classList.toggle("on", cb.checked);
-function showResult(ok, html) { const r = $("tr_result"); r.className = "result show " + (ok ? "ok" : "bad"); r.innerHTML = html; }
+function showResult(ok, html, id = "tr_result") { const r = $(id); r.className = "result show " + (ok ? "ok" : "bad"); r.innerHTML = html; }
 
 // ---------------- translation ----------------
 async function saveTr(patch) {
@@ -94,6 +94,15 @@ async function renderF() {
 function bindF() {
   $("f_enabled").onchange = e => saveF({ enabled: e.target.checked });
   $("f_apiKey").oninput = debounce(() => saveF({ apiKey: $("f_apiKey").value.trim() }).then(renderFFoot), 500);
+  $("f_test").onclick = async () => {
+    const apiKey = $("f_apiKey").value.trim();
+    if (!apiKey) return showResult(false, "先填 jev Key", "f_result");
+    const btn = $("f_test"); btn.disabled = true; btn.textContent = "测试中…";
+    const r = await chrome.runtime.sendMessage({ type: "jevTest", apiKey }).catch(e => ({ ok: false, error: e.message }));
+    btn.disabled = false; btn.textContent = "测试";
+    if (!r?.ok) return showResult(false, "✗ " + esc(r?.error || "未知错误"), "f_result");
+    showResult(true, `✓ ${r.model || "jev"} · ${r.ms}ms · 样例回复「AI 交易机器人本周赚了 40%」判定为推广的概率 ${Math.round((r.spam || 0) * 100)}%`, "f_result");
+  };
   $("f_threshold").oninput = e => { $("f_thresholdOut").value = Number(e.target.value).toFixed(2); };
   $("f_threshold").onchange = e => saveF({ threshold: Number(e.target.value) });
   CATS.forEach(c => $("c_" + c).onchange = async e => { setChip(e.target);
@@ -102,7 +111,7 @@ function bindF() {
 async function renderFFoot() {
   const { stats, quota } = await chrome.storage.local.get({ stats: { calls: 0, replies: 0, input_tokens: 0, output_tokens: 0, cost: 0 }, quota: null });
   const { apiKey } = await chrome.storage.sync.get({ apiKey: "" });
-  $("f_foot").textContent = `已判定 ${fmt(stats.replies)} 条 · ${fmt(stats.input_tokens + stats.output_tokens)} tokens · $${stats.cost.toFixed(4)}　${apiKey ? "自带 key · 不限量" : `免费额度${quota ? ` 今日 ${quota.used} / ${quota.limit}` : " 每天 300 条"}`}`;
+  $("f_foot").textContent = `已判定 ${fmt(stats.replies)} 条 · ${fmt(stats.input_tokens + stats.output_tokens)} tokens${stats.cost ? ` · $${stats.cost.toFixed(4)}` : ""}　${apiKey ? "TypeSafe 直连 · 不限量" : `免费额度${quota ? ` 今日 ${quota.used} / ${quota.limit}` : " 每天 300 条"}`}`;
 }
 
 // ---------------- init ----------------

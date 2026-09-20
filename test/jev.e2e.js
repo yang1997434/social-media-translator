@@ -1,6 +1,7 @@
-// Real jev call. Direct:  OPENROUTER_API_KEY=... node test/jev.e2e.js
-//                Proxy:   PROXY_URL=http://localhost:8787 node test/jev.e2e.js
-const { callJev, verdicts } = require("../shared.js");
+// Real jev call. TypeSafe:   TYPESAFE_API_KEY=... node test/jev.e2e.js
+//                OpenRouter: OPENROUTER_API_KEY=... node test/jev.e2e.js
+//                Proxy:      PROXY_URL=http://localhost:8787 node test/jev.e2e.js
+const { callJev, verdicts, JEV_TYPESAFE, JEV_OPENROUTER } = require("../shared.js");
 const THRESHOLD = 0.75;
 const original = { handle: "thsottiaux", text: "Update on rate limits in Codex. We found some inefficiencies when using images in long sessions with multiple compactions and shipped fixes." };
 const replies = [
@@ -22,7 +23,8 @@ async function viaProxy(url) {
   const t0 = Date.now();
   let resp;
   if (process.env.PROXY_URL) { const r = await viaProxy(process.env.PROXY_URL); console.log("proxy status", r.status, "quota", JSON.stringify(r.body.quota || r.body)); resp = r.body; }
-  else resp = await callJev(process.env.OPENROUTER_API_KEY, original, replies);
+  else if (process.env.TYPESAFE_API_KEY) resp = await callJev(process.env.TYPESAFE_API_KEY, original, replies, undefined, undefined, fetch, JEV_TYPESAFE);
+  else resp = await callJev(process.env.OPENROUTER_API_KEY, original, replies, undefined, undefined, fetch, JEV_OPENROUTER);
   if (!resp.answers) process.exit(1);
   const v = verdicts(resp.answers, replies.length, THRESHOLD);
   console.log(`model=${resp.model} latency=${Date.now() - t0}ms usage=${JSON.stringify(resp.usage)}`);

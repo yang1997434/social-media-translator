@@ -18,7 +18,7 @@ Chrome 扩展，MV3，无构建步骤，自带 Key（硅基流动 / Cerebras / O
 | **三家服务商** | 硅基流动（便宜）、Cerebras（最快）、OpenRouter（什么模型都有）。各自记住 Key 和模型，设置页一键切换 |
 | **卡死自愈** | 8 秒无首字节 / 流中 15 秒无新内容立刻断开重连；429/5xx 退避重试；页面侧对瞬时错误 3s、6s 自动重试 |
 | **不漏译** | 模型把 `W`、`ratio` 这类短梗原样返回时，自动再发一次强提示请求 |
-| **覆盖面** | X 推文、简介、趋势栏、探索页；Reddit 帖子、正文、评论、右栏「近期帖子」；任意网页一键翻译 |
+| **覆盖面** | X 推文、简介、趋势栏、探索页；Reddit 帖子、正文、评论、右栏「近期帖子」；任意网页右侧浮标一键翻译（可拖到任意高度） |
 | **花费透明** | 弹窗显示今日 / 本月 / 累计的段数、tokens 和金额；金额按每次请求当时的模型单价记账，换模型不串账 |
 
 <p align="center"><img src="docs/popup.png" width="300" alt="弹窗"> &nbsp; <img src="docs/side-tab.png" width="520" alt="侧边浮标：浅色页配深色玻璃，深色页配浅色玻璃"></p>
@@ -58,7 +58,7 @@ Chrome 扩展，MV3，无构建步骤，自带 Key（硅基流动 / Cerebras / O
 - **不和 X 自带的 Grok 翻译打架**：推文旁边有「翻译自 英语 · 显示原文」时这条推文完全交给 X。
 - **关思考三种写法**：硅基流动 `enable_thinking:false`，Cerebras `reasoning_effort:"none"`，OpenRouter `reasoning:{enabled:false}`（Gemini 3 只接受 `effort:"minimal"`，gpt-oss 最低 `low`）。服务商表在 `background.js` 的 `PROVIDERS`，再加一家只需加一行和 `manifest.json` 的 `host_permissions`。
 - **本地缓存**：`chrome.storage.local` LRU 2000 条，刷新页面不重复扣费；后台进程内常驻内存、改动后 0.8 秒写回。
-- **侧边浮标**：透明玻璃，浅色页配深色、深色页配浅色，按页面自己的背景色判断并实时跟随主题切换；设置里可关。
+- **侧边浮标**：透明玻璃，浅色页配深色、深色页配浅色，按页面自己的背景色判断并实时跟随主题切换；按住可沿右边缘上下拖到任意高度，位置记在本机、所有网页共用；设置里可关。
 
 ### 2026-09 实测
 

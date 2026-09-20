@@ -322,15 +322,53 @@
 
   // ---- side tab: a logo peeking from the right edge of every page; hover slides it out, click translates / restores ----
   let fab = null;
+  // Vertical position along the right edge, as a fraction of the viewport height so it survives window resizes.
+  // Dragged with the pointer; a press that barely moves is a click.
+  const FAB_Y_KEY = "fabY";
+  function placeFab(frac) {
+    if (!fab) return;
+    const h = fab.offsetHeight || 40, max = innerHeight - h - 8;
+    fab.style.top = Math.round(Math.min(max, Math.max(8, frac * innerHeight - h / 2))) + "px";
+  }
+  function makeDraggable(el) {
+    let startY = 0, startTop = 0, moved = false, id = null;
+    el.addEventListener("pointerdown", e => {
+      if (e.button !== 0) return;
+      id = e.pointerId; startY = e.clientY; startTop = el.getBoundingClientRect().top; moved = false;
+      el.setPointerCapture(id); el.classList.add("xrf-fab-drag");
+    });
+    el.addEventListener("pointermove", e => {
+      if (e.pointerId !== id) return;
+      const dy = e.clientY - startY;
+      if (!moved && Math.abs(dy) < 4) return;
+      moved = true;
+      const h = el.offsetHeight, top = Math.min(innerHeight - h - 8, Math.max(8, startTop + dy));
+      el.style.top = top + "px";
+    });
+    const end = e => {
+      if (e.pointerId !== id) return;
+      id = null; el.classList.remove("xrf-fab-drag");
+      if (!moved) return;
+      const r = el.getBoundingClientRect();
+      const frac = (r.top + r.height / 2) / innerHeight;
+      chrome.storage.local.set({ [FAB_Y_KEY]: frac }).catch(() => {});
+      // Swallow the click that follows a drag so it doesn't toggle translation.
+      el.addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+    };
+    el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+  }
   function ensureFab(show) {
     if (!show) { fab?.remove(); fab = null; return; }
     if (fab?.isConnected) return updateFab();
     fab = document.createElement("div");
-    fab.className = "xrf-fab"; fab.setAttribute("role", "button"); fab.setAttribute("aria-label", "翻译此页");
-    fab.innerHTML = `<img alt="" src="${chrome.runtime.getURL("icons/logo.svg")}"><span class="xrf-fab-label"></span>`;
+    fab.className = "xrf-fab"; fab.setAttribute("role", "button"); fab.setAttribute("aria-label", "翻译此页"); fab.title = "点击翻译 / 还原此页，按住上下拖动";
+    fab.innerHTML = `<img alt="" src="${chrome.runtime.getURL("icons/logo.svg")}" draggable="false"><span class="xrf-fab-label"></span>`;
     fab.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); togglePage(); });
+    makeDraggable(fab);
     (document.body || document.documentElement).appendChild(fab);
     detectTheme(); watchTheme(); updateFab();
+    chrome.storage.local.get({ [FAB_Y_KEY]: 0.5 }).then(r => placeFab(Number(r[FAB_Y_KEY]) || 0.5)).catch(() => placeFab(0.5));
+    addEventListener("resize", () => { if (fab) chrome.storage.local.get({ [FAB_Y_KEY]: 0.5 }).then(r => placeFab(Number(r[FAB_Y_KEY]) || 0.5)).catch(() => {}); });
   }
   function updateFab() {
     if (!fab) return;

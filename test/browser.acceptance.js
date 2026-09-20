@@ -114,6 +114,16 @@ const base = "http://localhost:8766";
     // Side tab: present on any page, click translates, click again restores; never translated itself; hidden by the setting.
     await page.locator(".xrf-fab").waitFor();
     assert.equal(await page.locator(".xrf-fab-label").textContent(), "翻译此页");
+    // Drag it down the edge: position changes, nothing toggles, and the new height is remembered.
+    const fabY = async () => page.evaluate(() => { const r = document.querySelector(".xrf-fab").getBoundingClientRect(); return Math.round(r.top + r.height / 2); });
+    const y0 = await fabY();
+    await page.mouse.move(1090, y0); await page.mouse.down(); for (let i = 1; i <= 10; i++) await page.mouse.move(1090, y0 + i * 20); await page.mouse.up();
+    await page.waitForTimeout(200);
+    assert.ok(Math.abs(await fabY() - (y0 + 200)) <= 3, "moved by the drag distance");
+    assert.equal(await page.locator(".xrf-fab-label").textContent(), "翻译此页");
+    assert.equal(await page.locator(".xrf-tr").count(), 0, "a drag is not a click");
+    assert.ok(Math.abs(await page.evaluate(() => window.__mock.local.mem.fabY * innerHeight) - (y0 + 200)) <= 3, "position saved");
+    console.log("PASS side tab: draggable along the edge, drag never toggles, height persisted");
     await page.locator(".xrf-fab").hover();
     await page.locator(".xrf-fab").click();
     await done();

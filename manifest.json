@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Social Media Translator",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "看 X / Reddit 时把外文帖子和评论原地变成中文，像原生中文页一样自然；同时折叠 X 评论区的推广、互动饵、跑题和 AI 套话。",
   "permissions": [
     "storage",

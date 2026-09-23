@@ -320,7 +320,7 @@
     updateFab();
   }
 
-  // ---- side tab: a logo peeking from the right edge of every page; hover slides it out, click translates / restores ----
+  // ---- side tab: a logo peeking from the right edge of every page but X / Reddit; hover slides it out, click translates / restores ----
   let fab = null;
   // Vertical position along the right edge, as a fraction of the viewport height so it survives window resizes.
   // Dragged with the pointer; a press that barely moves is a click.
@@ -399,7 +399,7 @@
     if (want && !enabled) start();
     else if (!want && enabled) stop();
     else if (want && modeChanged) { stop(); start(); }   // re-render from cache in the new mode
-    ensureFab(c.fab !== false);
+    ensureFab(!AUTO && c.fab !== false);   // X / Reddit translate on their own: no side tab there
     return c.configured;
   });
 

@@ -57,12 +57,71 @@ async function migrateTr() {
 let writeChain = Promise.resolve();
 function serialize(fn) { const p = writeChain.then(fn, fn); writeChain = p.then(() => {}, () => {}); return p; }
 
-async function installId() {
-  const { installId } = await chrome.storage.local.get("installId");
-  if (installId) return installId;
-  const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
-  await chrome.storage.local.set({ installId: id });
-  return id;
+// Memoized: two first-time callers racing would mint two ids, and the usage mirror below would then count this device twice.
+let installIdLoad = null;
+function installId() {
+  return installIdLoad ||= (async () => {
+    const { installId } = await chrome.storage.local.get("installId");
+    if (installId) return installId;
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
+    await chrome.storage.local.set({ installId: id });
+    return id;
+  })();
+}
+
+// ---------------- usage, summed across devices ----------------
+// Local calendar day, so 今日 turns over at the user's midnight (toISOString turned it over at 09:00 in Japan).
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+// Usage follows the Chrome account across devices. Each device keeps its own counters in local storage (translation
+// `tstats`, reply filter `stats`, written on every request) and mirrors them to sync as `<name>_<installId>`, so two
+// machines never write the same item; usage() sums them. storage.sync allows 120 writes a minute, so the mirror is
+// throttled, and it re-runs on every worker start in case the browser quit before a pending write.
+const MIRRORED = ["tstats", "stats"], MIRROR_MS = 10000;
+let mirrorTimer = null, mirroredAt = 0;
+function mirrorUsage() {
+  if (mirrorTimer) return;
+  mirrorTimer = setTimeout(async () => {
+    mirrorTimer = null;
+    try {
+      const [local, id] = await Promise.all([chrome.storage.local.get(MIRRORED), installId()]);
+      const keys = MIRRORED.map(k => `${k}_${id}`), synced = await chrome.storage.sync.get(keys), changed = {};
+      MIRRORED.forEach((k, i) => { if (local[k] && JSON.stringify(synced[keys[i]]) !== JSON.stringify(local[k])) changed[keys[i]] = local[k]; });
+      if (!Object.keys(changed).length) return;
+      mirroredAt = Date.now();
+      await chrome.storage.sync.set(changed);
+    } catch (e) { console.warn("[xrf] usage sync", e); }
+  }, Math.max(0, mirroredAt + MIRROR_MS - Date.now()));
+}
+mirrorUsage();
+
+// Every device summed, each in the same shape as one device's counters. This device's come from local storage, which is
+// ahead of its own synced copy. Translation buckets from before 0.6.3 have no booked cost; then the reader estimates it.
+async function usage() {
+  const [synced, local, id] = await Promise.all([chrome.storage.sync.get(null), chrome.storage.local.get(MIRRORED), installId()]);
+  const rows = name => {
+    const out = Object.keys(synced).filter(k => k.startsWith(name + "_") && k !== `${name}_${id}`).map(k => synced[k]);
+    if (local[name]) out.push(local[name]);
+    return out;
+  };
+  const sum = buckets => {
+    const s = { n: 0, in: 0, out: 0, cost: 0 };
+    let booked = true;
+    for (const b of buckets) {
+      if (!b?.n) continue;
+      s.n += b.n; s.in += b.in || 0; s.out += b.out || 0;
+      if (typeof b.cost === "number") s.cost += b.cost; else booked = false;
+    }
+    if (!booked) delete s.cost;
+    return s;
+  };
+  const day = today(), month = day.slice(0, 7), tr = rows("tstats"), filter = rows("stats");
+  return {
+    devices: { tstats: tr.length, stats: filter.length },
+    tstats: tr.length ? { day, month, today: sum(tr.filter(d => d.day === day).map(d => d.today)),
+      mon: sum(tr.filter(d => d.month === month).map(d => d.mon)), total: sum(tr.map(d => d.total)) } : null,
+    stats: filter.length ? filter.reduce((s, d) => { for (const k in s) s[k] += d[k] || 0; return s; }, { ...EMPTY_STATS }) : null,
+  };
 }
 
 // ---------------- reply filter ----------------
@@ -89,6 +148,7 @@ function recordUsage(usage, n) {
     stats.calls += 1; stats.replies += n;
     stats.input_tokens += usage?.input_tokens || 0; stats.output_tokens += usage?.output_tokens || 0; stats.cost += usage?.cost || 0;
     await chrome.storage.local.set({ stats });
+    mirrorUsage();
   });
 }
 
@@ -114,7 +174,6 @@ function hash(s) {   // FNV-1a, cache key
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36);
 }
-const today = () => new Date().toISOString().slice(0, 10);
 
 // Cost is booked here, per request, at the price of the model that actually served it (OpenRouter reports the exact USD
 // figure; the other hosts use the list price), so switching providers mid-month never re-prices earlier usage.
@@ -127,6 +186,7 @@ function addTrStats(n, tokIn, tokOut, cost) {
     if (s.month !== today().slice(0, 7)) { s.month = today().slice(0, 7); s.mon = empty(); }
     for (const b of [s.today, s.mon, s.total]) { b.n += n; b.in += tokIn; b.out += tokOut; b.cost = (b.cost || 0) + cost; }
     await chrome.storage.local.set({ tstats: s });
+    mirrorUsage();
   });
 }
 const costOf = (tr, usage) => usage.cost != null ? usage.cost * USD
@@ -280,6 +340,7 @@ const HANDLERS = {
     return translate(msg.texts || [], notify).finally(() => clearInterval(heartbeat));
   },
   trConfig: () => trConfig(),
+  usage: () => usage(),
   trDefaults: () => Promise.resolve({ defaults: TR_DEFAULTS, providers: PROVIDERS }),
   trTest: msg => trTest(msg.provider),
   trModels: msg => XRF_LLM.listModels(msg.provider).then(models => ({ models }), e => ({ error: e.message })),

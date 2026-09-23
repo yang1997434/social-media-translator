@@ -35,6 +35,7 @@
     "[[0]] honestly the image path was always the slow one, nice to see it fixed [[1]] more here: [[2]]": "[[0]] 说实话图片那条路径一直是最慢的，很高兴看到修好了 [[1]] 详见：[[2]]" };
   const handlers = {
     trDefaults: async () => ({ defaults: DEFAULTS, providers: PROVIDERS }),
+    usage: async () => ({ tstats: local.mem.tstats || null, stats: local.mem.stats || null, devices: { tstats: local.mem.tstats ? 1 : 0, stats: local.mem.stats ? 1 : 0 } }),
     trConfig: async () => { const t = await tr(); return { configured: !!t.apiKey, enabled: t.enabled !== false, sites: t.sites, fab: t.fab !== false, mode: t.mode, concurrency: t.concurrency, batch: t.batch, provider: t.provider, providerName: t.providerName, model: t.model, price: t.price }; },
     getQuota: async () => ({ used: 42, limit: 300 }),
     trTest: async () => { await new Promise(r => setTimeout(r, 600)); return { ok: true, sample: "说实话这是我见过对整件事最好的解读，[[0]] 一针见血 😂", ttfbMs: 412, totalMs: 1380, tps: 96.4 }; },

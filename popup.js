@@ -69,13 +69,13 @@ async function renderGeneric(tab) {
   if (on) translateTimer = setTimeout(() => renderTranslate(tab), 1500);
 }
 
-// Usage strip: cost when the model's price is known, tokens otherwise.
+// Usage strip: cost when the model's price is known, tokens otherwise. Summed over every device on this Chrome account.
 async function renderUsage() {
-  const { tstats } = await chrome.storage.local.get({ tstats: null });
+  const { tstats, devices } = await chrome.runtime.sendMessage({ type: "usage" }).catch(() => null) || {};
   const strip = $("usage");
   if (!tstats) { strip.hidden = true; return; }
-  const now = new Date().toISOString();
-  const buckets = { Today: tstats.day === now.slice(0, 10) ? tstats.today : null, Month: tstats.month === now.slice(0, 7) ? tstats.mon : null, Total: tstats.total };
+  strip.title = devices.tstats > 1 ? `${devices.tstats} 台设备合计` : "";
+  const buckets = { Today: tstats.today, Month: tstats.mon, Total: tstats.total };
   for (const [k, b] of Object.entries(buckets)) {
     const v = $("u" + k), s = $("u" + k + "S");
     if (!b || !b.n) { v.textContent = price ? "¥0" : "0"; s.innerHTML = "尚无翻译"; continue; }
@@ -92,7 +92,7 @@ async function init() {
   $("gear").onclick = openOptions; $("optLink").onclick = openOptions;
   const tab = await activeTab();
   $("trEnabled").onchange = async e => { const { tr } = await chrome.storage.sync.get({ tr: {} }); await chrome.storage.sync.set({ tr: { ...tr, enabled: e.target.checked } }); renderTranslate(tab); };
-  chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.tstats) renderUsage(); });
+  chrome.storage.onChanged.addListener((ch, area) => { if (ch.tstats || Object.keys(ch).some(k => k.startsWith("tstats_"))) renderUsage(); });
   renderTranslate(tab);
 }
 init();

@@ -79,12 +79,12 @@ const price = () => { const p = (Number(tr.priceIn) || Number(tr.priceOut)) ? [N
 const cost = b => { if (typeof b.cost === "number") return b.cost; const { pin, pout } = price(); return (b.in * pin + b.out * pout) / 1e6; };
 
 async function renderTrFoot() {
-  const { tstats } = await chrome.storage.local.get({ tstats: { day: "", today: { n: 0, in: 0, out: 0 }, total: { n: 0, in: 0, out: 0 } } });
-  const t = tstats.day === new Date().toISOString().slice(0, 10) ? tstats.today : { n: 0, in: 0, out: 0 };
-  const tot = tstats.total || { n: 0, in: 0, out: 0 };
+  const { tstats, devices } = await chrome.runtime.sendMessage({ type: "usage" }).catch(() => null) || {};   // every device on this Chrome account
+  const zero = { n: 0, in: 0, out: 0 };
+  const t = tstats?.today || zero, tot = tstats?.total || zero;
   const { pin, pout } = price();
   const line = (k, b) => `${k} ${fmt(b.n)} 段 · ${fmt(b.in + b.out)} tokens${pin || pout || typeof b.cost === "number" ? ` · ¥${cost(b).toFixed(3)}` : ""}`;
-  $("tr_foot").textContent = `${line("今日", t)}　${line("累计", tot)}`;
+  $("tr_foot").textContent = `${line("今日", t)}　${line("累计", tot)}${devices?.tstats > 1 ? `　${devices.tstats} 台设备合计` : ""}`;
   $("tr_priceIn").value = pin ? +pin.toFixed(2) : ""; $("tr_priceOut").value = pout ? +pout.toFixed(2) : "";
 }
 // Known model → clear any typed override so the list price applies; unknown → keep whatever the user typed.
@@ -125,9 +125,11 @@ function bindF() {
     const { categories } = await chrome.storage.sync.get({ categories: {} }); saveF({ categories: { ...categories, [c]: e.target.checked } }); });
 }
 async function renderFFoot() {
-  const { stats, quota } = await chrome.storage.local.get({ stats: { calls: 0, replies: 0, input_tokens: 0, output_tokens: 0, cost: 0 }, quota: null });
+  const u = await chrome.runtime.sendMessage({ type: "usage" }).catch(() => null);   // every device on this Chrome account
+  const stats = u?.stats || { calls: 0, replies: 0, input_tokens: 0, output_tokens: 0, cost: 0 }, n = u?.devices?.stats || 0;
+  const { quota } = await chrome.storage.local.get({ quota: null });   // the free proxy's quota is per install
   const { apiKey } = await chrome.storage.sync.get({ apiKey: "" });
-  $("f_foot").textContent = `已判定 ${fmt(stats.replies)} 条 · ${fmt(stats.input_tokens + stats.output_tokens)} tokens${stats.cost ? ` · $${stats.cost.toFixed(4)}` : ""}　${apiKey ? "TypeSafe 直连 · 不限量" : `免费额度${quota ? ` 今日 ${quota.used} / ${quota.limit}` : " 每天 300 条"}`}`;
+  $("f_foot").textContent = `已判定 ${fmt(stats.replies)} 条 · ${fmt(stats.input_tokens + stats.output_tokens)} tokens${stats.cost ? ` · $${stats.cost.toFixed(4)}` : ""}${n > 1 ? `（${n} 台设备合计）` : ""}　${apiKey ? "TypeSafe 直连 · 不限量" : `免费额度${quota ? ` 今日 ${quota.used} / ${quota.limit}` : " 每天 300 条"}`}`;
 }
 
 // ---------------- init ----------------
@@ -143,6 +145,7 @@ async function init() {
   // Live updates: marking a reply on x.com or a translation finishing shows up here without reloading.
   chrome.storage.onChanged.addListener((ch, area) => {
     if (area === "local") { if (ch.stats || ch.quota) renderFFoot(); if (ch.tstats) renderTrFoot(); }
+    if (area === "sync") { if (Object.keys(ch).some(k => k.startsWith("tstats_"))) renderTrFoot(); if (Object.keys(ch).some(k => k.startsWith("stats_"))) renderFFoot(); }
     if (area === "sync" && ch.blockedHandles) renderF();
   });
 }

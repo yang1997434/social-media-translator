@@ -50,6 +50,8 @@ const base = "http://localhost:8766";
     await done();
     assert.ok(await page.evaluate(() => window.requests.length) >= 3);
     console.log("PASS X: concurrent streamed responses render immediately");
+    assert.equal(await page.locator(".xrf-fab").count(), 0, "X translates on its own: no side tab");
+    console.log("PASS X: no side tab");
     // Trend rows: the name span is translated, the Chinese category / count spans are left alone, the menu button untouched.
     await page.waitForFunction(() => [...document.querySelectorAll('#trends [data-testid="trend"]')].every(t => t.querySelector(".xrf-tr")));
     // 関 is a Japanese variant (ICU maps it to 关), so X's half-localised "関東地方 的趋势" label is translated too — harmless.

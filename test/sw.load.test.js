@@ -1,4 +1,6 @@
 // Run the actual background -> LLM -> fetch path, with only Chrome storage/network mocked.
+// UTC+14: for most of the day the local date differs from the UTC date, so booking usage on the UTC day shows up here.
+process.env.TZ = "Pacific/Kiritimati";
 const vm = require("vm"), fs = require("fs"), path = require("path");
 const assert = require("node:assert/strict");
 const root = path.join(__dirname, "..");
@@ -62,6 +64,29 @@ const sse = texts => new Response(`data: ${JSON.stringify({ choices: [{ delta: {
   await new Promise(r => setTimeout(r, 1200));
   assert.equal(Object.keys(mem.tcache).length, 16, "cache is written through to storage");
   console.log("PASS actual worker path: streaming, 8 requests, max 3 concurrent, >4s queue, heartbeat cleanup, cache and stats");
+
+  // Usage is booked on the local calendar day, mirrored to sync under this device's key and summed with the other
+  // devices on the same Chrome account: translation and the (paid, own-key) reply filter alike.
+  const d = new Date(), day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  assert.equal(mem.tstats.day, day, "今日 turns over at local midnight");
+  const ownKey = "tstats_" + mem.installId;
+  assert.ok(sync[ownKey]?.total.n > 0, "this device's usage is mirrored to sync");
+  const b = (n, cost) => ({ n, in: n * 10, out: n * 5, cost });
+  sync.tstats_otherMac = { day, today: b(5, 0.5), month: day.slice(0, 7), mon: b(50, 5), total: b(500, 50) };
+  sync.tstats_oldMac = { day: "2020-01-01", today: b(7, 0.7), month: "2020-01", mon: b(70, 7), total: b(3, 0.3) };
+  sync[ownKey] = { ...mem.tstats, total: b(99999, 999) };   // stale own copy: must not be counted on top of local
+  mem.stats = { calls: 2, replies: 16, input_tokens: 3000, output_tokens: 200, cost: 0.01 };
+  sync.stats_otherMac = { calls: 1, replies: 8, input_tokens: 1500, output_tokens: 100, cost: 0.005 };
+  sync["stats_" + mem.installId] = { calls: 999, replies: 999, input_tokens: 0, output_tokens: 0, cost: 9 };
+  const merged = await new Promise(resolve => listener({ type: "usage" }, {}, resolve));
+  assert.deepEqual({ ...merged.devices }, { tstats: 3, stats: 2 });
+  assert.equal(merged.tstats.today.n, mem.tstats.today.n + 5, "stale days on other devices don't count as today");
+  assert.equal(merged.tstats.mon.n, mem.tstats.mon.n + 50);
+  assert.equal(merged.tstats.total.n, mem.tstats.total.n + 500 + 3);
+  assert.equal(+merged.tstats.total.cost.toFixed(3), +(mem.tstats.total.cost + 50.3).toFixed(3));
+  assert.deepEqual({ ...merged.stats, cost: +merged.stats.cost.toFixed(3) }, { calls: 3, replies: 24, input_tokens: 4500, output_tokens: 300, cost: 0.015 });
+  delete sync.tstats_otherMac; delete sync.tstats_oldMac; delete sync.stats_otherMac;
+  console.log("PASS usage on the local day, mirrored to sync per device; translation and filter totals sum every device");
 
   fetchImpl = async () => new Response('{"error":{"message":"invalid key"}}', { status: 401 });
   assert.match((await send(["auth failure"])).error, /401/);
@@ -150,4 +175,10 @@ const sse = texts => new Response(`data: ${JSON.stringify({ choices: [{ delta: {
   sync.tr = { provider: "cerebras", keys: { siliconflow: "sf-key" } };
   assert.match((await send(["no key"], "nokey")).error, /未配置/);
   console.log("PASS provider switch: Cerebras and OpenRouter hosts, per-provider keys/models, reasoning switches, missing key");
+
+  // The throttled mirror catches up with the last batch.
+  await new Promise(r => setTimeout(r, 10500));
+  assert.deepEqual(sync[ownKey], mem.tstats);
+  assert.deepEqual(sync["stats_" + mem.installId], mem.stats);
+  console.log("PASS throttled sync mirror ends equal to local usage");
 })().catch(e => { console.error(e); process.exitCode = 1; });

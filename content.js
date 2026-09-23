@@ -168,8 +168,8 @@
     const res = await chrome.runtime.sendMessage({ type: "classify", original: originalTweet(), replies: fresh.map(b => b.data) });
     if (!enabled || generation !== filterGeneration || path !== location.pathname) return;
     if (!res || res.error) {
-      stats.note = res?.error === "quota" ? "今日免费额度已用完，仅规则过滤" : "jev 暂不可用，仅规则过滤";
-      console[res?.error === "quota" ? "info" : "warn"]("[xrf]", stats.note, res?.error || "");
+      stats.note = res?.error === "nokey" ? "未填 jev Key，仅规则过滤" : "jev 暂不可用，仅规则过滤";
+      if (res?.error !== "nokey") console.warn("[xrf]", stats.note, res?.error || "");
       return;
     }
     stats.note = "";

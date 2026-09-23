@@ -1,10 +1,10 @@
 // Service worker. Two jobs:
-//  1. reply classification: free proxy (default) or direct OpenRouter jev (BYO key)
+//  1. reply classification: the user's own TypeSafe jev key; without one the page uses its local rules only
 //  2. translation: any OpenAI-compatible endpoint (SiliconFlow by default), streamed back to the tab paragraph by paragraph
 importScripts("shared.js", "llm.js", "lang.js");
 const { verdicts, callJev, JEV_TYPESAFE } = JEV_SHARED;
 
-const DEFAULTS = { apiKey: "", threshold: 0.75, proxyUrl: "https://xrf.ship2market.ai",
+const DEFAULTS = { apiKey: "", threshold: 0.75,
   categories: { spam: true, bait: true, offtopic: true, slop: true } };
 const EMPTY_STATS = { calls: 0, replies: 0, input_tokens: 0, output_tokens: 0, cost: 0 };
 
@@ -130,18 +130,6 @@ async function getExamples() {
   return JEV_SHARED.sanitizeExamples(examples);
 }
 
-async function viaProxy(settings, original, replies, examples) {
-  // Older deployed proxies only include text/handle in the model state.
-  const contextualReplies = replies.map(r => ({ ...r, text: r.displayName ? `[Display name: ${JSON.stringify(r.displayName)}]\n${r.text}` : r.text }));
-  const res = await fetch(settings.proxyUrl.replace(/\/$/, "") + "/classify", { method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ installId: await installId(), original, replies: contextualReplies, categories: settings.categories, examples }) });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error === "quota" || data.error === "budget" ? "quota" : `proxy ${res.status}: ${data.error || ""}`);
-  if (data.quota) await chrome.storage.local.set({ quota: data.quota });
-  return data;
-}
-
 function recordUsage(usage, n) {
   return serialize(async () => {
     const { stats } = await chrome.storage.local.get({ stats: EMPTY_STATS });
@@ -152,20 +140,14 @@ function recordUsage(usage, n) {
   });
 }
 
+// No free proxy: the upstream one is paid for by its author. Without a key the page keeps its local rules.
 async function classify(msg) {
   const settings = await getSettings();
+  if (!settings.apiKey) return { error: "nokey" };
   const examples = await getExamples();
-  const resp = settings.apiKey
-    ? await callJev(settings.apiKey, msg.original, msg.replies, settings.categories, examples, fetch, JEV_TYPESAFE)
-    : await viaProxy(settings, msg.original, msg.replies, examples);
+  const resp = await callJev(settings.apiKey, msg.original, msg.replies, settings.categories, examples, fetch, JEV_TYPESAFE);
   await recordUsage(resp.usage, msg.replies.length);
-  return { verdicts: verdicts(resp.answers || {}, msg.replies.length, settings.threshold), mode: settings.apiKey ? "byok" : "proxy" };
-}
-
-async function getQuota() {
-  const settings = await getSettings();
-  const res = await fetch(`${settings.proxyUrl.replace(/\/$/, "")}/quota?id=${await installId()}`);
-  return res.ok ? res.json() : null;
+  return { verdicts: verdicts(resp.answers || {}, msg.replies.length, settings.threshold), mode: "byok" };
 }
 
 // ---------------- translation ----------------
@@ -327,7 +309,6 @@ function setBadge(tabId, n) {
 
 const HANDLERS = {
   classify: msg => classify(msg),
-  getQuota: () => getQuota(),
   openOptions: () => { chrome.runtime.openOptionsPage(); return Promise.resolve({ ok: true }); },
   count: (msg, sender) => { if (sender.tab) setBadge(sender.tab.id, msg.n); return Promise.resolve({ ok: true }); },
   translate: (msg, sender) => {
@@ -356,7 +337,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
-  // Remove credentials and usage left by the retired feature on update/reload.
-  await Promise.all([chrome.storage.sync.remove("video"), chrome.storage.local.remove(["vstats", "vaudio"]), migrateTr()]);
+  // Remove credentials and usage left by retired features (video; the free proxy's quota) on update/reload.
+  await Promise.all([chrome.storage.sync.remove("video"), chrome.storage.local.remove(["vstats", "vaudio", "quota"]), migrateTr()]);
   if (reason === "install") chrome.runtime.openOptionsPage();
 });

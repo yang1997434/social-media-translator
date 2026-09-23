@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Social Media Translator",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "看 X / Reddit 时把外文帖子和评论原地变成中文，像原生中文页一样自然；同时折叠 X 评论区的推广、互动饵、跑题和 AI 套话。",
   "permissions": [
     "storage",
@@ -10,7 +10,6 @@
   ],
   "host_permissions": [
     "https://api.typesafe.ai/*",
-    "https://xrf.ship2market.ai/*",
     "https://api.siliconflow.cn/*",
     "https://api.cerebras.ai/*",
     "https://openrouter.ai/*"
@@ -64,7 +63,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "homepage_url": "https://xrf.ship2market.ai/",
+  "homepage_url": "https://github.com/yang1997434/social-media-translator",
   "web_accessible_resources": [
     {
       "resources": [

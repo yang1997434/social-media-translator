@@ -30,7 +30,7 @@ const sse = texts => new Response(`data: ${JSON.stringify({ choices: [{ delta: {
 (async () => {
   assert.equal(typeof ctx.XRF_LLM.chat, "function");
   await installed({ reason: "update" });
-  assert.deepEqual(removed, [["sync", "video"], ["local", ["vstats", "vaudio"]]]);
+  assert.deepEqual(removed, [["sync", "video"], ["local", ["vstats", "vaudio", "quota"]]]);
   console.log("PASS: update removes only retired feature settings and usage");
   let requests = 0, running = 0, peak = 0;
   fetchImpl = async (url, init) => {
@@ -175,6 +175,12 @@ const sse = texts => new Response(`data: ${JSON.stringify({ choices: [{ delta: {
   sync.tr = { provider: "cerebras", keys: { siliconflow: "sf-key" } };
   assert.match((await send(["no key"], "nokey")).error, /未配置/);
   console.log("PASS provider switch: Cerebras and OpenRouter hosts, per-provider keys/models, reasoning switches, missing key");
+
+  // Reply filter without the user's own jev key: local rules only, no request to anyone's server.
+  fetchImpl = () => { throw new Error("no request expected without a jev key"); };
+  const nokey = await new Promise(resolve => listener({ type: "classify", original: { handle: "op", text: "hi" }, replies: [{ handle: "a", text: "b" }] }, {}, resolve));
+  assert.equal(nokey.error, "nokey");
+  console.log("PASS reply filter without a jev key sends nothing (no free proxy)");
 
   // The throttled mirror catches up with the last batch.
   await new Promise(r => setTimeout(r, 10500));

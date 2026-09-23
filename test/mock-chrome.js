@@ -25,7 +25,6 @@
   local.mem.examples = { bad: [{ id: "9", t: "Reset pls", h: "someone", ts: 0 }], good: [{ id: "10", t: "Thanks, the cache hit-rate explanation was the missing piece.", h: "tibo", ts: 1 }] };
   local.mem.stats = { calls: 41, replies: 328, input_tokens: 61500, output_tokens: 3900, cost: 0.0246 };
   local.mem.tstats = { day: new Date().toISOString().slice(0, 10), today: { n: 57, in: 12400, out: 6100 }, month: new Date().toISOString().slice(0, 7), mon: { n: 1240, in: 268000, out: 131000 }, total: { n: 1893, in: 402000, out: 197000 } };
-  local.mem.quota = { used: 42, limit: 300 };
   sync.mem.blockedHandles = ["spammer123", "growth_guru"];
   const tr = async () => { const t = { ...DEFAULTS, ...(await sync.get({ tr: {} })).tr }; const P = PROVIDERS[t.provider] || PROVIDERS.siliconflow; return { ...t, apiKey: t.keys?.[t.provider] || "", model: t.models?.[t.provider] || P.model, providerName: P.name, price: qs.get("price") === "0" ? null : P.prices[t.models?.[t.provider] || P.model] || null }; };
   // Canned translations for the translator fixture: keep [[n]] placeholders where the source had them.
@@ -37,7 +36,6 @@
     trDefaults: async () => ({ defaults: DEFAULTS, providers: PROVIDERS }),
     usage: async () => ({ tstats: local.mem.tstats || null, stats: local.mem.stats || null, devices: { tstats: local.mem.tstats ? 1 : 0, stats: local.mem.stats ? 1 : 0 } }),
     trConfig: async () => { const t = await tr(); return { configured: !!t.apiKey, enabled: t.enabled !== false, sites: t.sites, fab: t.fab !== false, mode: t.mode, concurrency: t.concurrency, batch: t.batch, provider: t.provider, providerName: t.providerName, model: t.model, price: t.price }; },
-    getQuota: async () => ({ used: 42, limit: 300 }),
     trTest: async () => { await new Promise(r => setTimeout(r, 600)); return { ok: true, sample: "说实话这是我见过对整件事最好的解读，[[0]] 一针见血 😂", ttfbMs: 412, totalMs: 1380, tps: 96.4 }; },
     trModels: async () => ({ models: ["Qwen/Qwen3.6-35B-A3B", "Qwen/Qwen3.5-122B-A10B", "zai-org/GLM-4.5-Air", "Qwen/Qwen3.8-27B", "qwen-3.8-27b", "gpt-oss-120b"] }),
     trClearCache: async () => ({ ok: true }),

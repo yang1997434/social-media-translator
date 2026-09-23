@@ -1,43 +1,105 @@
-<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>Reply Filter for X · 上架填写助手</title><style>
-body{font:15px/1.6 -apple-system,system-ui,sans-serif;max-width:860px;margin:32px auto;padding:0 20px;color:#0f1419;background:#f7f9f9}h1{font-size:24px}section{background:#fff;border:1px solid #e1e8ed;border-radius:12px;padding:18px 20px;margin:16px 0}h2{font-size:17px;margin:0 0 4px}.hint{color:#536471;margin:0 0 12px}.f{margin:12px 0}.f label{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px;margin-bottom:4px}pre{white-space:pre-wrap;word-break:break-word;background:#f2f4f5;border-radius:8px;padding:10px 12px;margin:0;font:13px/1.55 ui-monospace,Menlo,monospace;max-height:220px;overflow:auto}button{border:0;border-radius:999px;background:#1d9bf0;color:#fff;font-weight:600;padding:4px 14px;cursor:pointer;font-size:12px}button.ok{background:#00ba7c}.meta{color:#536471;font-size:13px}
-</style></head><body><h1>Reply Filter for X · 上架填写助手</h1><p class="meta">后台地址：<a href="https://chrome.google.com/webstore/devconsole" target="_blank">chrome.google.com/webstore/devconsole</a> · 名称和简短说明来自 zip 里的 manifest，无需填写。简短说明：Collapse spam, engagement bait, off-topic and AI-filler replies on X. Nothing deleted, one click to expand. Learns what you hide.</p>
-<section><h2>第 1 步 · 上传</h2><p class="hint">点右上角 New item，上传这个文件</p>
-<div class="f"><label><span>zip 路径（文件选择框里按 Cmd+Shift+G 粘贴）</span><button>复制</button></label><pre>/Users/zhuyansen/content/x-reply-filter/dist/x-reply-filter-0.5.1.zip</pre></div>
-</section>
-<section><h2>第 2 步 · Store listing</h2><p class="hint">语言选 Chinese (Simplified)；Category 选 Social &amp; Communication；上传 3 张截图 + 1 张小宣传图（Finder 已打开素材文件夹）</p>
-<div class="f"><label><span>详细说明（中文）</span><button>复制</button></label><pre>刷 X 的评论区，总被推广、复读机和 AI 套话淹没？Reply Filter for X 自动把这些低价值回复折叠成一行灰条，真正有内容的讨论留在眼前。
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>Social Media Translator · 上架填写助手</title><style>body{font:15px/1.65 -apple-system,"PingFang SC",system-ui,sans-serif;max-width:860px;margin:32px auto;padding:0 20px;color:#0f1419;background:#f7f9f9}
+h1{font-size:24px}h2{font-size:19px;margin-top:28px}h3{font-size:16px;margin:22px 0 6px}code{background:#eef1f3;border-radius:4px;padding:0 4px;font-size:13px}
+.f{margin:10px 0 14px;background:#fff;border:1px solid #e1e8ed;border-radius:10px;padding:10px 12px}.f label{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px;margin-bottom:6px;gap:12px}
+pre{white-space:pre-wrap;word-break:break-word;background:#f2f4f5;border-radius:8px;padding:10px 12px;margin:0;font:13px/1.55 ui-monospace,Menlo,monospace;max-height:260px;overflow:auto}
+button{border:0;border-radius:999px;background:#1d9bf0;color:#fff;font-weight:600;padding:4px 14px;cursor:pointer;font-size:12px;flex:none}button.ok{background:#00ba7c}a{color:#1d9bf0}</style></head><body>
+<h1>Chrome Web Store 上架材料（Social Media Translator 0.8.0）</h1>
+<p>上传包：<code>dist/x-reply-filter-0.8.0.zip</code>（<code>./build.sh</code> 生成，打包时会扫描密钥；包里只有扩展本身的代码和图标，不含任何 API Key）。</p>
+<p>填写时可以打开 <code>store/listing.html</code>，每一段都有「复制」按钮。</p>
+<h2>你本人要做的（账号和付款我不能代办）</h2>
+<ul>
+<li>打开 <a href="https://chrome.google.com/webstore/devconsole" target="_blank">https://chrome.google.com/webstore/devconsole</a> ，用你的 Google 账号登录（账号需要开启两步验证）</li>
+<li>首次使用：接受开发者协议，支付 <b>US$5 一次性注册费</b></li>
+<li>「账号」页：填发布者名称，验证联系邮箱（不验证不能发布）；交易者声明选「非交易者」（个人、非商业）</li>
+</ul>
+<h2>表单（按后台页面顺序）</h2>
+<h3>1 · 上传</h3>
+<p>「新增项目」→ 上传 <code>dist/x-reply-filter-0.8.0.zip</code>。名称、简短说明、图标从 zip 里的 manifest 读取，不用填。</p>
+<h3>2 · 商品详情（Store listing）</h3>
+<ul>
+<li><b>语言</b>：中文（简体）</li>
+<li><b>类别</b>：Tools（工具）</li>
+<li><b>详细说明</b>：</li>
+</ul>
+<div class="f"><label><span>详细说明</span><button>复制</button></label><pre>看 X（推特）和 Reddit 时，外文帖子和评论原地变成中文：译文直接出现在原文的位置，沿用原文的字体字号，读起来就像帖子本来就是中文写的。
 
-■ 折叠四类回复：推广/垃圾、互动饵（&quot;so true&quot;、纯 emoji）、跑题、AI 套话
-■ 不删除任何内容：每条被折叠的回复点一下即可展开，页面底部可一键全部展开
-■ 会学你的口味：悬停回复点「隐藏」，它就成为例子，AI 以后把同类也折叠；判错了点「误判」，该回复永不再折叠
-■ 自定义规则：关键词（支持正则）和屏蔽用户列表，本地生效
-■ 零配置：安装即用，每天 300 条免费 AI 判定额度；填自己的 OpenRouter key 可不限量
-■ 透明：点工具栏图标查看本页扫描数、隐藏数、今日额度和总开关
+■ 原地翻译：@用户名、链接、表情原样保留、照常可点；悬停点「原文」一键切回，也可以选双语对照
+■ 滚到哪翻到哪：提前预取、流式返回，哪条先好先显示
+■ 不做无用功：已经是中文的不翻；X 自带 Grok 翻译过的推文交给 X；纯链接、纯表情、数字不发请求；翻过的内容本地缓存，不重复花钱
+■ 任意网页：X / Reddit 以外的网页，点右侧浮标或工具栏图标，一键翻译 / 还原整页
+■ 自选服务商：硅基流动、Cerebras、OpenRouter 三选一，用你自己的 API Key，费用直接付给服务商
+■ 花费透明：弹窗显示今日、本月、累计的段数和金额；同一 Chrome 账号下的多台电脑自动合计
+■ 评论过滤（可选）：折叠 X 评论区的推广、互动饵、跑题和 AI 套话；本地规则免费，填自己的 TypeSafe Key 可开启 AI 判定
 
-工作方式：先用本地规则过滤明显的垃圾（零成本、不联网），其余回复交给 TypeSafe Jev 决策模型打分，超过阈值才折叠。
+使用前需要自备 API Key：安装后设置页会自动打开，选服务商、粘贴 Key、点「测试」看到 ✓ 就可以用了。
 
-隐私：只处理你正在看的推文页上的公开回复文本，不读取账号、Cookie、私信或浏览历史。详见隐私政策。</pre></div>
-<div class="f"><label><span>详细说明（English，想加第二语言时用）</span><button>复制</button></label><pre>Tired of promo, copy-paste reactions and AI filler burying the real discussion under X posts? Reply Filter for X collapses low-value replies into a one-line bar so the useful ones stand out.
+隐私：开发者不运营任何服务器，不收集任何数据。文本只发给你自己选择的服务商，API Key 只存在你的浏览器里。
+开源（MIT）：github.com/yang1997434/social-media-translator</pre></div>
+<ul>
+<li><b>截图（1280×800）</b>：<code>store/screenshot-1-inplace.png</code>、<code>screenshot-2-popup.png</code>、<code>screenshot-3-anypage.png</code>、<code>screenshot-4-providers.png</code></li>
+<li><b>小型宣传图块（440×280）</b>：<code>store/promo-small-440x280.png</code></li>
+<li><b>官方网址 / 首页</b>：<a href="https://github.com/yang1997434/social-media-translator" target="_blank">https://github.com/yang1997434/social-media-translator</a></li>
+<li><b>支持网址</b>：<a href="https://github.com/yang1997434/social-media-translator/issues" target="_blank">https://github.com/yang1997434/social-media-translator/issues</a></li>
+</ul>
+<p>想加英文作为第二语言时用这段：</p>
+<div class="f"><label><span>想加英文作为第二语言时用这段</span><button>复制</button></label><pre>Read X (Twitter) and Reddit in Chinese. Foreign-language posts and comments are translated into Simplified Chinese in place: the translation takes the original&#x27;s spot and font, so the page reads as if it were written in Chinese.
 
-• Collapses four kinds of replies: spam/promo, engagement bait, off-topic, AI filler
-• Nothing is deleted: click any bar to expand, or expand all at once
-• Learns your taste: hover a reply and click Hide to make it an example; click &quot;wrong&quot; on a bar and that reply is never hidden again
-• Custom rules: keywords (regex supported) and blocked handles, applied locally
-• Zero setup: 300 free AI evaluations per day; add your own OpenRouter key for unlimited use
+• In place: @handles, links and emoji stay clickable; hover and click &quot;原文&quot; to see the original, or switch to bilingual mode
+• As you scroll: prefetched and streamed, each post appears as soon as it is ready
+• No wasted calls: text already in Chinese, posts X translated with Grok, bare links, emoji and numbers are skipped; translations are cached locally
+• Any page: outside X / Reddit, click the side tab or the toolbar icon to translate or restore the whole page
+• Bring your own key: SiliconFlow, Cerebras or OpenRouter; you pay the provider directly
+• Cost at a glance: today / this month / total, summed across your devices on the same Chrome account
+• Optional reply filter: folds promo, engagement bait, off-topic and AI-filler replies on X; local rules are free, AI scoring uses your own TypeSafe key
 
-Local rules run first (free, offline). Remaining replies are scored by the TypeSafe Jev decision model and collapsed only above a threshold.</pre></div>
-<div class="f"><label><span>Homepage URL</span><button>复制</button></label><pre>https://xrf.ship2market.ai/</pre></div>
-<div class="f"><label><span>Support URL（仓库建好后再填，否则留空）</span><button>复制</button></label><pre>https://github.com/zhuyansen/x-reply-filter/issues</pre></div>
-</section>
-<section><h2>第 3 步 · Privacy practices</h2><p class="hint">Remote code 选 No；数据类型只勾 Website content，其余都不勾；底部三条声明全勾</p>
-<div class="f"><label><span>Single purpose</span><button>复制</button></label><pre>Collapse low-value replies on X (x.com) post pages so users can focus on substantive discussion.</pre></div>
-<div class="f"><label><span>storage 权限理由</span><button>复制</button></label><pre>Saves the user&#x27;s settings (on/off, threshold, custom keywords, blocked handles, optional API key), the examples they marked, and cached verdicts so a reply is never evaluated twice.</pre></div>
-<div class="f"><label><span>Host 权限理由（一个输入框，整段粘贴）</span><button>复制</button></label><pre>x.com and twitter.com: the content script reads the public reply text on the post page the user is viewing and collapses low-value replies in place. xrf.ship2market.ai: the extension&#x27;s own free-tier API, which forwards reply text to the decision model and returns scores. openrouter.ai: used only when the user enters their own OpenRouter API key, to call the model directly from the browser.</pre></div>
-<div class="f"><label><span>Remote code 说明（若要求填写）</span><button>复制</button></label><pre>No remote code. All JavaScript is bundled in the package; the extension only sends JSON to an API and receives JSON scores.</pre></div>
-<div class="f"><label><span>Privacy policy URL</span><button>复制</button></label><pre>https://xrf.ship2market.ai/privacy</pre></div>
-</section>
-<section><h2>第 4 步 · Distribution</h2><p class="hint">Visibility: Public · Regions: All regions · Pricing: Free</p>
-</section>
-<section><h2>第 5 步 · 保存</h2><p class="hint">点 Save draft。先不要点 Submit for review，切到后台标签后回 Claude 一声，我帮你逐页核对。</p>
-</section>
+Requires your own API key: the settings page opens after install. Pick a provider, paste the key, click Test.
+Privacy: the developer runs no servers and collects no data. Text goes only to the provider you choose; keys stay in your browser.
+Open source (MIT): github.com/yang1997434/social-media-translator</pre></div>
+<h3>3 · 隐私权（Privacy practices）</h3>
+<ul>
+<li><b>单一用途说明</b>：</li>
+</ul>
+<div class="f"><label><span>单一用途说明</span><button>复制</button></label><pre>Translate foreign-language social media (posts and comments on X and Reddit, or any web page on demand) into Simplified Chinese in place. An optional setting folds low-quality replies on X so translated threads are easier to read.</pre></div>
+<ul>
+<li><b>权限理由</b>：</li>
+<li><code>storage</code></li>
+</ul>
+<div class="f"><label><span>storage</span><button>复制</button></label><pre>Saves the user&#x27;s settings and their own API keys, a local cache of translations so the same text is never paid for twice, the usage counters shown in the popup, and the reply examples the user marked.</pre></div>
+<ul>
+<li><code>activeTab</code></li>
+</ul>
+<div class="f"><label><span>activeTab</span><button>复制</button></label><pre>When the user clicks &quot;Translate this page&quot; in the popup, only the current tab is translated.</pre></div>
+<ul>
+<li><code>scripting</code></li>
+</ul>
+<div class="f"><label><span>scripting</span><button>复制</button></label><pre>Injects the translator into the current tab when the user clicks &quot;Translate this page&quot; and the content script is not running there yet (for example, tabs opened before the extension was installed).</pre></div>
+<ul>
+<li>主机权限（Host permission）</li>
+</ul>
+<div class="f"><label><span>主机权限（Host permission）</span><button>复制</button></label><pre>API hosts (api.siliconflow.cn, api.cerebras.ai, openrouter.ai, api.typesafe.ai): the extension calls only the provider the user selected, with the user&#x27;s own API key; no other server is contacted. Content scripts: on x.com, twitter.com and reddit.com posts and comments are translated automatically. On other http/https pages the content script only shows a small side tab at the right edge; the page is not read and nothing is sent until the user clicks it.</pre></div>
+<ul>
+<li><b>远程代码</b>：选「否，我没有使用远程代码」（所有 JS 都在包内）</li>
+<li><b>数据使用</b>：勾选 <b>网站内容</b>（要翻译的页面文字发给用户选的服务商）和 <b>身份验证信息</b>（用户填写的 API Key，只发给对应服务商）；其余都不勾</li>
+<li>三条声明全部勾选：不出售给第三方 / 不用于与单一用途无关的目的 / 不用于信用评估</li>
+<li><b>隐私权政策网址</b>：<a href="https://github.com/yang1997434/social-media-translator/blob/main/PRIVACY.md" target="_blank">https://github.com/yang1997434/social-media-translator/blob/main/PRIVACY.md</a></li>
+</ul>
+<h3>4 · 分发（Distribution）</h3>
+<ul>
+<li>公开范围：<b>公开</b>（任何人都能搜到并安装）；只想发链接给熟人就选「不公开列出」</li>
+<li>地区：所有地区</li>
+</ul>
+<h3>5 · 提交审核</h3>
+<p>点「提交以供审核」。可以取消勾选「审核通过后自动发布」，通过后自己点发布。</p>
+<h2>审核预期与风险</h2>
+<ul>
+<li>首次提交一般几个工作日。扩展在所有网站上运行（为了显示浮标），会触发更严格的人工审核，可能更久</li>
+<li>可能的拒绝理由：「单一用途」。翻译和评论过滤是两个功能，说明里已经把过滤写成翻译的附属设置；如果仍被拒，可以把过滤从上架版里拿掉</li>
+<li>界面只有中文，面向中文用户</li>
+</ul>
+<h2>通过之后</h2>
+<ul>
+<li>两台 Mac 都从商店安装，并在 <code>chrome://extensions</code> <b>移除现在这个「已解压」的版本</b>，否则同一个页面会被两份扩展各翻一遍</li>
+<li>商店版的扩展 ID 和现在不同，相当于新扩展：API Key 要重填一次（Chrome 同步正常的话，填一台另一台自动有），已解压版里记的历史用量不会带过去</li>
+<li>以后更新：改 <code>manifest.json</code> 的 <code>version</code> → <code>./build.sh</code> → 后台「软件包」上传新 zip → 提交审核</li>
+</ul>
 <script>document.querySelectorAll("button").forEach(b=>b.onclick=async()=>{await navigator.clipboard.writeText(b.closest(".f").querySelector("pre").textContent);b.textContent="已复制";b.classList.add("ok");setTimeout(()=>{b.textContent="复制";b.classList.remove("ok")},1500)});</script></body></html>

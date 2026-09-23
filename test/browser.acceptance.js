@@ -139,6 +139,19 @@ const base = "http://localhost:8766";
     await page.waitForTimeout(400);
     assert.equal(await page.locator(".xrf-fab").count(), 0);
     console.log("PASS side tab: hidden by the setting");
+    // Extension reloaded while the page stays open: the orphaned script loses chrome.storage. Resizing must not throw,
+    // and the dead side tab goes away on the next touch.
+    await page.goto(base + "/test/generic.fixture.html");
+    await page.locator(".xrf-fab").waitFor();
+    await page.evaluate(() => { chrome.runtime.id = undefined; chrome.storage = undefined; });
+    await page.setViewportSize({ width: 900, height: 3000 });
+    await page.waitForTimeout(100);
+    assert.deepEqual(errors, [], "resize after the extension was reloaded");
+    await page.locator(".xrf-fab").dispatchEvent("pointerdown", { button: 0, pointerId: 1 });
+    assert.equal(await page.locator(".xrf-fab").count(), 0);
+    assert.deepEqual(errors, []);
+    await page.setViewportSize({ width: 1100, height: 4000 });
+    console.log("PASS side tab: no errors after an extension reload; the orphaned tab removes itself");
     await page.goto(base + "/test/generic.fixture.html");
     await message({ type: "trTogglePage" });
     await page.waitForFunction(() => window.requests.length > 0);

@@ -39,6 +39,7 @@
     if (dead) return;
     dead = true; io?.disconnect(); mo?.disconnect();
     clearTimeout(scanTimer); clearInterval(routeTimer);
+    fab?.remove(); fab = null;   // the extension was reloaded: this side tab can no longer do anything
   }
   const guard = fn => async (...a) => {
     if (!alive()) return teardown();
@@ -323,8 +324,10 @@
   // ---- side tab: a logo peeking from the right edge of every page but X / Reddit; hover slides it out, click translates / restores ----
   let fab = null;
   // Vertical position along the right edge, as a fraction of the viewport height so it survives window resizes.
-  // Dragged with the pointer; a press that barely moves is a click.
+  // Dragged with the pointer; a press that barely moves is a click. Kept in memory too, so resizing never touches
+  // chrome.storage (gone from a script orphaned by an extension reload).
   const FAB_Y_KEY = "fabY";
+  let fabY = 0.5;
   function placeFab(frac) {
     if (!fab) return;
     const h = fab.offsetHeight || 40, max = innerHeight - h - 8;
@@ -334,6 +337,7 @@
     let startY = 0, startTop = 0, moved = false, id = null;
     el.addEventListener("pointerdown", e => {
       if (e.button !== 0) return;
+      if (!alive()) return teardown();
       id = e.pointerId; startY = e.clientY; startTop = el.getBoundingClientRect().top; moved = false;
       el.setPointerCapture(id); el.classList.add("xrf-fab-drag");
     });
@@ -350,8 +354,8 @@
       id = null; el.classList.remove("xrf-fab-drag");
       if (!moved) return;
       const r = el.getBoundingClientRect();
-      const frac = (r.top + r.height / 2) / innerHeight;
-      chrome.storage.local.set({ [FAB_Y_KEY]: frac }).catch(() => {});
+      fabY = (r.top + r.height / 2) / innerHeight;
+      if (alive()) chrome.storage.local.set({ [FAB_Y_KEY]: fabY }).catch(() => {});
       // Swallow the click that follows a drag so it doesn't toggle translation.
       el.addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
     };
@@ -367,9 +371,9 @@
     makeDraggable(fab);
     (document.body || document.documentElement).appendChild(fab);
     detectTheme(); watchTheme(); updateFab();
-    chrome.storage.local.get({ [FAB_Y_KEY]: 0.5 }).then(r => placeFab(Number(r[FAB_Y_KEY]) || 0.5)).catch(() => placeFab(0.5));
-    addEventListener("resize", () => { if (fab) chrome.storage.local.get({ [FAB_Y_KEY]: 0.5 }).then(r => placeFab(Number(r[FAB_Y_KEY]) || 0.5)).catch(() => {}); });
+    chrome.storage.local.get({ [FAB_Y_KEY]: 0.5 }).then(r => { fabY = Number(r[FAB_Y_KEY]) || 0.5; placeFab(fabY); }).catch(() => placeFab(fabY));
   }
+  addEventListener("resize", () => placeFab(fabY));   // once: ensureFab runs on every settings change
   function updateFab() {
     if (!fab) return;
     const busy = enabled && (inflight > 0 || queue.length > 0);

@@ -13,7 +13,7 @@
 
 ### 1 · 上传
 
-「新增项目」→ 上传 `dist/x-reply-filter-0.8.0.zip`。名称、简短说明、图标从 zip 里的 manifest 读取，不用填。
+「新增项目」→ 上传 `dist/x-reply-filter-0.8.0.zip`。名称和简短说明从 zip 里的 manifest 读取，不用填。
 
 ### 2 · 商品详情（Store listing）
 
@@ -38,6 +38,7 @@
 开源（MIT）：github.com/yang1997434/social-media-translator
 ```
 
+- **商店图标（128×128）**：`store/icon-128.png`（图案 96×96 居中，四周留 16px 透明边，符合图片指南）
 - **截图（1280×800）**：`store/screenshot-1-inplace.png`、`screenshot-2-popup.png`、`screenshot-3-anypage.png`、`screenshot-4-providers.png`
 - **小型宣传图块（440×280）**：`store/promo-small-440x280.png`
 - **官方网址 / 首页**：https://github.com/yang1997434/social-media-translator

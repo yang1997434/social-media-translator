@@ -7,7 +7,7 @@ iframe{border:0;background:#fff;display:block;box-shadow:0 4px 20px rgba(0,0,0,.
 const qs = new URLSearchParams(location.search); const page = qs.get("page") || "popup";
 fetch("/" + page + ".html").then(r => r.text()).then(html => {
   const f = document.createElement("iframe"); f.id = page;
-  f.srcdoc = html.replace("<head>", `<head><base href="${location.origin}/"><script src="/test/mock-chrome.js?${qs}"><\/script>`);
+  f.srcdoc = html.replace("<head>", `<head><base href="${location.origin}/"><script src="/providers.js"><\/script><script src="/test/mock-chrome.js?${qs}"><\/script>`);
   document.body.appendChild(f);
 });
 </script></body></html>

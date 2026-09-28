@@ -13,7 +13,8 @@
   };
   const sync = store("sync"), local = store("local");
   const USD = 7.1;
-  const PROVIDERS = {
+  // The real table when the page loaded providers.js (UI fixture), else a minimal one for the translator fixtures.
+  const PROVIDERS = typeof XRF_PROVIDERS !== "undefined" ? XRF_PROVIDERS.PROVIDERS : {
     siliconflow: { name: "硅基流动", baseUrl: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen3.6-35B-A3B", thinking: "enable_thinking", keyHint: "粘贴硅基流动 API Key（sk-…）", keyUrl: "https://cloud.siliconflow.cn/account/ak", prices: { "Qwen/Qwen3.6-35B-A3B": [1.8, 10.8], "Qwen/Qwen3.5-122B-A10B": [0.8, 6.4] } },
     cerebras: { name: "Cerebras", baseUrl: "https://api.cerebras.ai/v1", model: "qwen-3.8-27b", thinking: "reasoning_effort", keyHint: "粘贴 Cerebras API Key（csk-…）", keyUrl: "https://cloud.cerebras.ai/", prices: { "qwen-3.8-27b": [0.99 * USD, 1.49 * USD] } },
     openrouter: { name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", model: "google/gemini-3.1-flash-lite", thinking: "openrouter", keyHint: "粘贴 OpenRouter API Key（sk-or-…）", keyUrl: "https://openrouter.ai/keys", prices: { "google/gemini-3.1-flash-lite": [0.25 * USD, 1.5 * USD] } },
@@ -34,13 +35,24 @@
     "[[0]] honestly the image path was always the slow one, nice to see it fixed [[1]] more here: [[2]]": "[[0]] 说实话图片那条路径一直是最慢的，很高兴看到修好了 [[1]] 详见：[[2]]" };
   const handlers = {
     trDefaults: async () => ({ defaults: DEFAULTS, providers: PROVIDERS }),
-    usage: async () => ({ tstats: local.mem.tstats || null, stats: local.mem.stats || null, devices: { tstats: local.mem.tstats ? 1 : 0, stats: local.mem.stats ? 1 : 0 } }),
+    usage: async () => { const n = Number(qs.get("devices")) || 1; return { tstats: local.mem.tstats || null, stats: local.mem.stats || null,
+      devices: { tstats: local.mem.tstats ? n : 0, stats: local.mem.stats ? 1 : 0, others: Array.from({ length: n - 1 }, (_, i) => Date.now() - (3 + i * 120) * 60000) } }; },
     trConfig: async () => { const t = await tr(); return { configured: !!t.apiKey, enabled: t.enabled !== false, sites: t.sites, fab: t.fab !== false, mode: t.mode, concurrency: t.concurrency, batch: t.batch, provider: t.provider, providerName: t.providerName, model: t.model, price: t.price }; },
     trTest: async () => { await new Promise(r => setTimeout(r, 600)); return { ok: true, sample: "说实话这是我见过对整件事最好的解读，[[0]] 一针见血 😂", ttfbMs: 412, totalMs: 1380, tps: 96.4 }; },
+    // Key detection as background.js does it, minus the network: shape → one company (answers after a beat) or a choice.
+    trDetect: async ({ key, company }) => {
+      const ids = Object.keys(PROVIDERS).filter(id => company ? PROVIDERS[id].company === company : PROVIDERS[id].key && new RegExp(PROVIDERS[id].key).test(key));
+      if (!ids.length) return { error: "unknown" };
+      const cos = [...new Set(ids.map(id => PROVIDERS[id].company))];
+      if (cos.length > 1) return { choices: cos.map(c => ({ company: c, name: PROVIDERS[ids.find(id => PROVIDERS[id].company === c)].name })) };
+      await new Promise(r => setTimeout(r, 400));
+      if (/bad/.test(key)) return { provider: ids[0], error: "rejected", detail: "API Key 无效 (401)" };
+      return { provider: ids[ids.length - 1], model: PROVIDERS[ids[ids.length - 1]].model, models: [PROVIDERS[ids[ids.length - 1]].model, "other-model-a", "other-model-b"] };
+    },
     trModels: async () => ({ models: ["Qwen/Qwen3.6-35B-A3B", "Qwen/Qwen3.5-122B-A10B", "zai-org/GLM-4.5-Air", "Qwen/Qwen3.8-27B", "qwen-3.8-27b", "gpt-oss-120b"] }),
     trClearCache: async () => ({ ok: true }),
     jevTest: async () => { await new Promise(r => setTimeout(r, 500)); return { ok: true, ms: 640, model: "jev-1.13.0", spam: 0.97, usage: { input_tokens: 310, output_tokens: 20 } }; },
-    openOptions: async () => ({ ok: true }), count: async () => ({ ok: true }),
+    openOptions: async () => ({ ok: true }), count: async () => ({ ok: true }), trFrames: async () => ({ ok: true }),
     translate: async msg => { await new Promise(r => setTimeout(r, 100 + Math.random() * 900)); return { translations: msg.texts.map(t => CANNED[t] || "（译）" + t) }; },
   };
   let onMessage = null;

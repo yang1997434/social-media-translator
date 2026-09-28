@@ -13,15 +13,27 @@ const STRICT_HINT = "\n\n（注意：以上每一项都不是简体中文，必�
 
 const THINKING_MODELS = /qwen3|glm-?4\.[5-9]|glm-?5|deepseek-v3\.[1-9]|deepseek-v4|hunyuan-a13b|minimax-m/i;
 
+// Chat models with no reasoning phase: a reasoning_effort field would be rejected there.
+const PLAIN_MODELS = /gpt-4|non-reasoning|instruct|mistral-large|llama/i;
+
 // thinking: how this endpoint switches reasoning off — translation never needs a thinking phase.
-//   "enable_thinking"  SiliconFlow and most OpenAI-compatible hosts of hybrid models
-//   "reasoning_effort" Cerebras (gpt-oss only goes down to "low")
+//   "enable_thinking"  SiliconFlow, Bailian and most OpenAI-compatible hosts of hybrid models (sent only to families that think)
+//   "reasoning_effort" Cerebras, OpenAI, xAI, Groq, Mistral, Fireworks, DeepInfra: "none" (gpt-oss only goes down to "low")
+//   "thinking_type"    DeepSeek, Kimi, Zhipu, Doubao, MiniMax: thinking:{type:"disabled"} (DeepSeek and Doubao think by default)
+//   "together"         Together's reasoning:{enabled:false}
 //   "openrouter"       OpenRouter's unified `reasoning` object; Gemini 3 refuses "none" but takes "minimal" (0 reasoning tokens), gpt-oss floors at "low"
-function buildBody(model, texts, stream, strict, thinking = "enable_thinking") {
-  const body = { model, stream: !!stream, temperature: 0.2,
+//   "none"             send nothing: Gemini's schema rejects unknown fields and its lowest level is already the default; Claude Haiku, ERNIE
+// opts.temp === false: the host rejects a non-default temperature (Kimi, OpenAI reasoning models, Claude). opts.usage === false:
+// the host rejected stream_options once already.
+function buildBody(model, texts, stream, strict, thinking = "enable_thinking", opts = {}) {
+  const body = { model, stream: !!stream,
     messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: JSON.stringify(texts) + (strict ? STRICT_HINT : "") }] };
-  if (stream) body.stream_options = { include_usage: true };
-  if (thinking === "reasoning_effort") body.reasoning_effort = /gpt-oss/i.test(model) ? "low" : "none";
+  if (opts.temp !== false) body.temperature = 0.2;
+  if (stream && opts.usage !== false) body.stream_options = { include_usage: true };
+  if (thinking === "none") return body;
+  if (thinking === "reasoning_effort") { if (!PLAIN_MODELS.test(model)) body.reasoning_effort = /gpt-oss/i.test(model) ? "low" : "none"; }
+  else if (thinking === "thinking_type") body.thinking = { type: "disabled" };
+  else if (thinking === "together") body.reasoning = { enabled: false };
   else if (thinking === "openrouter") {
     body.reasoning = /gemini/i.test(model) ? { effort: "minimal", exclude: true } : /gpt-oss|minimax/i.test(model) ? { effort: "low", exclude: true } : { enabled: false, exclude: true };
     body.usage = { include: true };   // exact USD cost in the usage object
@@ -93,7 +105,7 @@ async function fetchWithTimeout(url, init, timeoutMs, fetchImpl) {
 }
 
 const base = p => String(p.baseUrl || "").replace(/\/+$/, "");
-const auth = p => ({ Authorization: "Bearer " + p.apiKey, "Content-Type": "application/json" });
+const auth = p => ({ Authorization: "Bearer " + p.apiKey, "Content-Type": "application/json", ...(p.headers || {}) });
 const TRANSIENT = [429, 502, 503, 504];
 
 // A failure worth a fresh request: transient HTTP status (after a backoff), a connection that produced nothing for too
@@ -114,11 +126,11 @@ function checkServiceError(data) {
 // GET /models → sorted model ids. Accepts {data:[...]}, {models:[...]} or a bare array of strings / {id}.
 async function listModels(provider, opts = {}) {
   const res = await fetchWithTimeout(base(provider) + "/models", { headers: auth(provider) }, opts.timeoutMs || 15000, opts.fetch || fetch);
-  if (!res.ok) throw new Error(errMessage(res.status, await res.text().catch(() => "")));
+  if (!res.ok) throw Object.assign(new Error(errMessage(res.status, await res.text().catch(() => ""))), { status: res.status });
   const data = await res.json().catch(() => null);
   const list = Array.isArray(data) ? data : data?.data || data?.models;
   if (!Array.isArray(list)) throw new Error("无法解析模型列表（接口未按 OpenAI 格式返回）");
-  const ids = [...new Set(list.map(m => (typeof m === "string" ? m : m?.id || m?.name)).filter(Boolean))];
+  const ids = [...new Set(list.map(m => (typeof m === "string" ? m : m?.id || m?.name)).filter(Boolean).map(id => id.replace(/^models\//, "")))];   // Gemini: models/<id>
   if (!ids.length) throw new Error("模型列表为空");
   return ids.sort();
 }
@@ -144,7 +156,8 @@ async function attempt(provider, texts, opts, budget) {
   let res;
   try {
     res = await (opts.fetch || fetch)(base(provider) + "/chat/completions",
-      { method: "POST", headers: auth(provider), body: JSON.stringify(buildBody(provider.model, texts, !!opts.stream, opts.strict, provider.thinking)), signal: ctrl.signal });
+      { method: "POST", headers: auth(provider), signal: ctrl.signal,
+        body: JSON.stringify(buildBody(provider.model, texts, !!opts.stream, opts.strict, provider.thinking, { temp: provider.temp, usage: budget.flags.usageOpt })) });
   } catch (e) {
     clearTimeout(timer);
     if (ctrl.signal.aborted) throw stalled();
@@ -154,7 +167,12 @@ async function attempt(provider, texts, opts, budget) {
   arm(budget.stallMs);
   try {
     if (!res.ok) {
-      const msg = errMessage(res.status, await res.text().catch(() => ""));
+      const text = await res.text().catch(() => "");
+      const msg = errMessage(res.status, text);
+      // Some hosts' schemas don't know stream_options (usage then comes from our estimate): drop it and ask again at once.
+      if ((res.status === 400 || res.status === 422) && opts.stream && budget.flags.usageOpt && /stream_options|include_usage/i.test(text)) {
+        budget.flags.usageOpt = false; throw new Retryable(msg, 0);
+      }
       if (!TRANSIENT.includes(res.status)) throw new Error(msg);
       const wait = retryAfterSeconds(res);
       if (wait > 8) throw new Error(msg);   // don't violate a long server-directed cooldown just to retry within our deadline
@@ -215,9 +233,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function chat(provider, texts, opts = {}) {
   const total = opts.timeoutMs || 40000, deadline = Date.now() + total;
   const attempts = (opts.retries ?? 2) + 1;
+  const flags = { usageOpt: true };   // survives across attempts
   let last = null;
   for (let i = 0; i < attempts && Date.now() < deadline; i++) {
-    try { return await attempt(provider, texts, opts, { deadline, attempt: i, ttfbMs: opts.ttfbTimeoutMs ?? 8000, stallMs: opts.stallTimeoutMs ?? 15000 }); }
+    try { return await attempt(provider, texts, opts, { deadline, attempt: i, ttfbMs: opts.ttfbTimeoutMs ?? 8000, stallMs: opts.stallTimeoutMs ?? 15000, flags }); }
     catch (e) {
       last = e;
       if (!e.retryable || i === attempts - 1 || Date.now() + (e.delayMs || 0) >= deadline) break;

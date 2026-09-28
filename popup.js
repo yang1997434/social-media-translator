@@ -5,7 +5,7 @@ const yuan = v => v >= 100 ? "¥" + v.toFixed(0) : v >= 1 ? "¥" + v.toFixed(2) 
 
 async function activeTab() { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); return tab; }
 const site = url => /^https:\/\/(x|twitter)\.com\//.test(url || "") ? "x" : /^https:\/\/([\w-]+\.)?reddit\.com\//.test(url || "") ? "reddit" : null;
-const ask = (tab, msg) => chrome.tabs.sendMessage(tab.id, msg).catch(() => null);
+const ask = (tab, msg) => chrome.tabs.sendMessage(tab.id, msg, { frameId: 0 }).catch(() => null);   // the top frame answers for the whole page
 const openOptions = () => chrome.runtime.openOptionsPage();
 let translateTimer = null;
 let price = null;   // [¥/M in, ¥/M out] for the configured model, or null when unknown
@@ -26,7 +26,7 @@ async function renderTranslate(tab) {
   if (!cfg?.configured) {
     $("usage").hidden = true;
     $("trSub").textContent = "还没配置翻译 API";
-    body.innerHTML = `<div class="cta"><button class="tr" id="setup">填写硅基流动 API Key</button></div>`;
+    body.innerHTML = `<div class="cta"><button class="tr" id="setup">填写 API Key</button></div>`;
     $("setup").onclick = openOptions;
     return;
   }
@@ -74,7 +74,7 @@ async function renderUsage() {
   const { tstats, devices } = await chrome.runtime.sendMessage({ type: "usage" }).catch(() => null) || {};
   const strip = $("usage");
   if (!tstats) { strip.hidden = true; return; }
-  strip.title = devices.tstats > 1 ? `${devices.tstats} 台设备合计` : "";
+  $("dev").textContent = devices.tstats > 1 ? ` · ${devices.tstats} 台设备合计` : "";   // same Chrome account, summed
   const buckets = { Today: tstats.today, Month: tstats.mon, Total: tstats.total };
   for (const [k, b] of Object.entries(buckets)) {
     const v = $("u" + k), s = $("u" + k + "S");

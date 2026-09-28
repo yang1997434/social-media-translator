@@ -1,32 +1,53 @@
 // Service worker. Two jobs:
 //  1. reply classification: the user's own TypeSafe jev key; without one the page uses its local rules only
 //  2. translation: any OpenAI-compatible endpoint (SiliconFlow by default), streamed back to the tab paragraph by paragraph
-importScripts("shared.js", "llm.js", "lang.js");
+importScripts("shared.js", "llm.js", "lang.js", "providers.js");
 const { verdicts, callJev, JEV_TYPESAFE } = JEV_SHARED;
 
 const DEFAULTS = { apiKey: "", threshold: 0.75,
   categories: { spam: true, bait: true, offtopic: true, slop: true } };
 const EMPTY_STATS = { calls: 0, replies: 0, input_tokens: 0, output_tokens: 0, cost: 0 };
 
-// Two hosts, both OpenAI-compatible. Measured 2026-09 on a 6-tweet batch from Japan: SiliconFlow Qwen3.6-35B-A3B first
-// tweet 0.75s / batch 1.5s; Cerebras qwen-3.8-27b (1850 tok/s, reasoning off) first tweet 0.46s / batch 0.53s, better
-// slang, ~2x the price. The former SiliconFlow default (Qwen3.5-35B-A3B) hung on ~30% of requests and is migrated away.
-// Prices are ¥ per million tokens (list prices; USD converted at 7.1) for the cost readout.
-const USD = 7.1;
-const PROVIDERS = {
-  siliconflow: { name: "硅基流动", baseUrl: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen3.6-35B-A3B", thinking: "enable_thinking", keyHint: "粘贴硅基流动 API Key（sk-…）", keyUrl: "https://cloud.siliconflow.cn/account/ak",
-    prices: { "Qwen/Qwen3.6-35B-A3B": [1.8, 10.8], "Qwen/Qwen3.5-122B-A10B": [0.8, 6.4], "zai-org/GLM-4.5-Air": [1, 6], "Qwen/Qwen3.8-27B": [3, 12], "Qwen/Qwen3.6-27B": [3, 18], "deepseek-ai/DeepSeek-V4-Flash": [3, 9], "Qwen/Qwen3.5-35B-A3B": [0.4, 3.2] } },
-  cerebras: { name: "Cerebras", baseUrl: "https://api.cerebras.ai/v1", model: "qwen-3.8-27b", thinking: "reasoning_effort", keyHint: "粘贴 Cerebras API Key（csk-…）", keyUrl: "https://cloud.cerebras.ai/",
-    prices: { "qwen-3.8-27b": [0.99 * USD, 1.49 * USD], "gpt-oss-120b": [0.35 * USD, 0.75 * USD] } },
-  // Fallback host with every model behind it; one extra hop (~1s slower than the two above from Japan).
-  openrouter: { name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", model: "google/gemini-3.1-flash-lite", thinking: "openrouter", keyHint: "粘贴 OpenRouter API Key（sk-or-…）", keyUrl: "https://openrouter.ai/keys",
-    prices: { "google/gemini-3.1-flash-lite": [0.25 * USD, 1.5 * USD], "google/gemini-3.8-flash": [0.75 * USD, 3.75 * USD], "openai/gpt-5.4-nano": [0.2 * USD, 1.25 * USD], "qwen/qwen3.6-35b-a3b": [0.1 * USD, 0.9 * USD], "deepseek/deepseek-v4-flash": [0.04 * USD, 0.07 * USD] } },
-};
+// The provider table (hosts, key shapes, default models, prices) lives in providers.js.
+const { USD, PROVIDERS } = XRF_PROVIDERS;
 const TR_DEFAULTS = { enabled: true, provider: "siliconflow", keys: {}, models: {}, mode: "replace", sites: { x: true, reddit: true }, fab: true, concurrency: 3, batch: 6, priceIn: null, priceOut: null };
 const LEGACY_MODELS = { "Qwen/Qwen3.5-35B-A3B": PROVIDERS.siliconflow.model };
 const TR_CACHE_MAX = 2000;
 const TR_EMPTY_STATS = { day: "", today: { n: 0, in: 0, out: 0, cost: 0 }, month: "", mon: { n: 0, in: 0, out: 0, cost: 0 }, total: { n: 0, in: 0, out: 0, cost: 0 } };
 const priceOf = tr => (Number(tr.priceIn) || Number(tr.priceOut)) ? [Number(tr.priceIn) || 0, Number(tr.priceOut) || 0] : PROVIDERS[tr.provider].prices[tr.model] || null;
+
+// Which provider a pasted key belongs to. `key` in the table is the shape a provider's keys take (several can share one:
+// a bare sk-<32 hex> fits more than one company). A key only ever goes to hosts of the company its shape points to:
+// when the shape fits several companies the user picks one, it is never tried on the others. A company with regional
+// hosts (China / global) is asked on each, since an account exists on one of them; GET /models is free and also gives
+// the model list the default is picked from.
+function detectKey(key, company) {
+  key = String(key || "").trim();
+  const ids = Object.keys(PROVIDERS).filter(id => id !== "custom" && (company ? PROVIDERS[id].company === company : PROVIDERS[id].key && new RegExp(PROVIDERS[id].key).test(key)));
+  if (!ids.length) return Promise.resolve({ error: "unknown" });
+  const companies = [...new Set(ids.map(id => PROVIDERS[id].company))];
+  if (companies.length > 1) return Promise.resolve({ choices: companies.map(c => ({ company: c, name: brandOf(ids.find(id => PROVIDERS[id].company === c)) })) });
+  // 400/401/403: this host doesn't know the key (xAI and Gemini answer a bad key with 400). 404/405: the key got past auth
+  // but the host has no model list (Zhipu, Ark). Anything else (5xx, network): can't tell, trust the shape.
+  const REJECT = [400, 401, 403];
+  return Promise.all(ids.map(id => XRF_LLM.listModels({ ...PROVIDERS[id], apiKey: key }, { timeoutMs: 8000 })
+    .then(models => ({ id, models }), e => ({ id, error: e.message, status: e.status })))).then(tries => {
+    const hit = tries.find(t => t.models) || tries.find(t => t.status === 404 || t.status === 405);
+    if (hit) return { provider: hit.id, model: hit.models ? pickModel(hit.id, hit.models) : PROVIDERS[hit.id].model, models: hit.models || null };
+    if (tries.every(t => REJECT.includes(t.status))) return { provider: ids[0], error: "rejected", detail: tries[0].error };
+    const up = tries.find(t => !REJECT.includes(t.status));
+    return { provider: up.id, model: PROVIDERS[up.id].model, unverified: up.error };
+  });
+}
+const hostOf = url => { try { return new URL(url).host; } catch { return "自定义接口"; } };
+const brandOf = id => PROVIDERS[id].brand || PROVIDERS[id].name;
+// The table's default when the account offers it, else the first available model matching the provider's preferences.
+function pickModel(id, models) {
+  const P = PROVIDERS[id];
+  if (!models?.length || models.includes(P.model)) return P.model;
+  for (const re of P.prefer || []) { const m = models.find(x => new RegExp(re, "i").test(x)); if (m) return m; }
+  return P.model;
+}
 
 async function getSettings() {
   const s = await chrome.storage.sync.get(DEFAULTS);
@@ -41,7 +62,7 @@ function resolveTr(tr) {
   if (tr?.apiKey && !t.keys.siliconflow) t.keys.siliconflow = tr.apiKey;
   if (legacyModel && !t.models.siliconflow) t.models.siliconflow = legacyModel;
   const P = PROVIDERS[t.provider];
-  return { ...t, baseUrl: P.baseUrl, apiKey: t.keys[t.provider] || "", model: t.models[t.provider] || P.model, thinking: P.thinking };
+  return { ...t, baseUrl: t.provider === "custom" ? String(t.customBase || "").trim() : P.baseUrl, apiKey: t.keys[t.provider] || "", model: t.models[t.provider] || P.model, thinking: P.thinking };
 }
 async function getTr() { return resolveTr((await chrome.storage.sync.get({ tr: {} })).tr); }
 // Persist the schema migration so the options page shows what is actually being called.
@@ -86,7 +107,9 @@ function mirrorUsage() {
     try {
       const [local, id] = await Promise.all([chrome.storage.local.get(MIRRORED), installId()]);
       const keys = MIRRORED.map(k => `${k}_${id}`), synced = await chrome.storage.sync.get(keys), changed = {};
-      MIRRORED.forEach((k, i) => { if (local[k] && JSON.stringify(synced[keys[i]]) !== JSON.stringify(local[k])) changed[keys[i]] = local[k]; });
+      // The synced copy carries when it was written, so the other devices can show how fresh this one's numbers are.
+      const bare = o => o && JSON.stringify({ ...o, ts: 0 });
+      MIRRORED.forEach((k, i) => { if (local[k] && bare(synced[keys[i]]) !== bare(local[k])) changed[keys[i]] = { ...local[k], ts: Date.now() }; });
       if (!Object.keys(changed).length) return;
       mirroredAt = Date.now();
       await chrome.storage.sync.set(changed);
@@ -116,8 +139,9 @@ async function usage() {
     return s;
   };
   const day = today(), month = day.slice(0, 7), tr = rows("tstats"), filter = rows("stats");
+  const others = Object.keys(synced).filter(k => k.startsWith("tstats_") && k !== `tstats_${id}`).map(k => synced[k].ts || 0);
   return {
-    devices: { tstats: tr.length, stats: filter.length },
+    devices: { tstats: tr.length, stats: filter.length, others },   // others: when each other device last synced (0: before 0.9)
     tstats: tr.length ? { day, month, today: sum(tr.filter(d => d.day === day).map(d => d.today)),
       mon: sum(tr.filter(d => d.month === month).map(d => d.mon)), total: sum(tr.map(d => d.total)) } : null,
     stats: filter.length ? filter.reduce((s, d) => { for (const k in s) s[k] += d[k] || 0; return s; }, { ...EMPTY_STATS }) : null,
@@ -214,6 +238,7 @@ const untranslated = (src, out) => !/\p{Script=Han}/u.test(out) && XRF_LANG.shou
 async function translate(texts, notify) {
   const tr = await getTr();
   if (!tr.apiKey) return { error: "未配置翻译 API Key" };
+  if (!tr.baseUrl || !tr.model) return { error: "未配置接口地址或模型" };
   const keyOf = t => hash(`zh-Hans-v2|${tr.baseUrl}|${tr.model}|${t}`);
   const tcache = await loadCache();
   const out = new Array(texts.length).fill(null);
@@ -287,8 +312,8 @@ async function trTest(provider) {
 
 async function trConfig() {
   const tr = await getTr();
-  return { configured: !!tr.apiKey, enabled: tr.enabled !== false, sites: tr.sites, fab: tr.fab !== false, mode: tr.mode, concurrency: tr.concurrency, batch: tr.batch,
-    provider: tr.provider, providerName: PROVIDERS[tr.provider].name, model: tr.model, price: priceOf(tr) };
+  return { configured: !!(tr.apiKey && tr.baseUrl && tr.model), enabled: tr.enabled !== false, sites: tr.sites, fab: tr.fab !== false, mode: tr.mode, concurrency: tr.concurrency, batch: tr.batch,
+    provider: tr.provider, providerName: tr.provider === "custom" ? hostOf(tr.baseUrl) : PROVIDERS[tr.provider].name, model: tr.model, price: priceOf(tr) };
 }
 
 // One tiny real call so the options page can confirm the key before the user goes browsing.
@@ -313,7 +338,8 @@ const HANDLERS = {
   count: (msg, sender) => { if (sender.tab) setBadge(sender.tab.id, msg.n); return Promise.resolve({ ok: true }); },
   translate: (msg, sender) => {
     const tabId = sender?.tab?.id;
-    const send = tabId != null && msg.reqId ? payload => chrome.tabs.sendMessage(tabId, { ...payload, reqId: msg.reqId }).catch(() => {}) : null;
+    const frame = sender?.frameId != null ? { frameId: sender.frameId } : undefined;
+    const send = tabId != null && msg.reqId ? payload => chrome.tabs.sendMessage(tabId, { ...payload, reqId: msg.reqId }, frame).catch(() => {}) : null;
     const notify = send ? (index, text) => send({ type: "trPartial", index, text }) : null;
     // Keep the content-script watchdog alive during a healthy queue/request.
     // If the worker disappears, these stop and the page can offer a retry.
@@ -321,10 +347,16 @@ const HANDLERS = {
     return translate(msg.texts || [], notify).finally(() => clearInterval(heartbeat));
   },
   trConfig: () => trConfig(),
+  // Page translation spans iframes (claude.ai artifacts live in one): the top frame's toggle reaches every frame, a late
+  // frame asks the top frame whether to join, and child counts go up to the top frame's side tab / popup.
+  trFrames: (msg, sender) => { if (sender.tab) chrome.tabs.sendMessage(sender.tab.id, { type: "trFrames", on: !!msg.on }).catch(() => {}); return Promise.resolve({ ok: true }); },
+  trFrameHello: (_msg, sender) => sender.tab ? chrome.tabs.sendMessage(sender.tab.id, { type: "trFrameOn" }, { frameId: 0 }).then(r => ({ on: !!r?.on }), () => ({ on: false })) : Promise.resolve({ on: false }),
+  trFrameStats: (msg, sender) => { if (sender.tab) chrome.tabs.sendMessage(sender.tab.id, { type: "trFrameStats", frameId: sender.frameId, stats: msg.stats }, { frameId: 0 }).catch(() => {}); return Promise.resolve({ ok: true }); },
   usage: () => usage(),
   trDefaults: () => Promise.resolve({ defaults: TR_DEFAULTS, providers: PROVIDERS }),
   trTest: msg => trTest(msg.provider),
   trModels: msg => XRF_LLM.listModels(msg.provider).then(models => ({ models }), e => ({ error: e.message })),
+  trDetect: msg => detectKey(msg.key, msg.company),
   trClearCache: () => clearCache().then(() => ({ ok: true })),
   jevTest: msg => jevTest(msg.apiKey),
 };

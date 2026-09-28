@@ -2,9 +2,9 @@
 
 > 看 X / Reddit 时，外文帖子和评论**原地**变成中文——译文直接出现在原文的位置、用原文的字体字号，像帖子本来就是中文写的。任何网页右侧有一个半隐藏的小 logo，悬停展开，一键翻译 / 还原整页。顺带折叠 X 评论区的推广、互动饵、跑题和 AI 套话。
 
-Chrome 扩展，MV3，无构建步骤，自带 Key（硅基流动 / Cerebras / OpenRouter 三选一），本地缓存，不经任何中转。
+Chrome 扩展，MV3，无构建步骤，自带 Key（国内外 20 多家服务商，粘贴 Key 自动认出是哪家；也能接任意 OpenAI 兼容接口），本地缓存，不经任何中转。
 
-魔改自 [Jason Zhu 的 Reply Filter for X](https://github.com/zhuyansen/x-reply-filter)（MIT）。上游是评论过滤器；这个分支把重心换成了**翻译**：原地翻译引擎、三家服务商、卡死自愈、玻璃质感的弹窗和侧边浮标，评论过滤功能原样保留。
+魔改自 [Jason Zhu 的 Reply Filter for X](https://github.com/zhuyansen/x-reply-filter)（MIT）。上游是评论过滤器；这个分支把重心换成了**翻译**：原地翻译引擎、多家服务商与 Key 自动识别、卡死自愈、玻璃质感的弹窗和侧边浮标，评论过滤功能原样保留。
 
 <p align="center"><img src="docs/timeline.png" width="560" alt="X 时间线原地翻译示意：译文占据原文位置，悬停出现「原文」按钮；X 自带 Grok 翻译的推文不重复翻"></p>
 
@@ -15,7 +15,7 @@ Chrome 扩展，MV3，无构建步骤，自带 Key（硅基流动 / Cerebras / O
 | **原地替换** | 译文继承原元素的字号行高，@用户名、链接、表情原样保留可点击；悬停出现「原文」一键切回。也可选「双语对照」 |
 | **滚到哪翻到哪** | 提前 600px 预取，流式返回、哪条先好先显示；6 条推文一批 0.5–1.5 秒 |
 | **不做无用功** | 已是简体中文不发请求；X 自带的 Grok 翻译（「翻译自 英语 · 显示原文」）完全交给 X，点「显示原文」也不会被翻回去；`r/xxx`、纯链接、纯表情、数字不发请求 |
-| **三家服务商** | 硅基流动（便宜）、Cerebras（最快）、OpenRouter（什么模型都有）。各自记住 Key 和模型，设置页一键切换 |
+| **Key 自动识别** | 粘贴任意一家的 Key，自动认出服务商和账号所在区域（国内 / 国际站），填好默认模型。支持硅基流动、DeepSeek、阿里云百炼、Kimi、智谱、豆包、千帆、MiniMax、OpenAI、Gemini、Claude、Grok、Groq、Cerebras、OpenRouter、Mistral 等；其他 OpenAI 兼容接口填地址即可。各家分别记住 Key 和模型 |
 | **卡死自愈** | 8 秒无首字节 / 流中 15 秒无新内容立刻断开重连；429/5xx 退避重试；页面侧对瞬时错误 3s、6s 自动重试 |
 | **不漏译** | 模型把 `W`、`ratio` 这类短梗原样返回时，自动再发一次强提示请求 |
 | **覆盖面** | X 推文、简介、趋势栏、探索页；Reddit 帖子、正文、评论、右栏「近期帖子」；X / Reddit 以外的任意网页右侧浮标一键翻译（可拖到任意高度） |
@@ -27,11 +27,11 @@ Chrome 扩展，MV3，无构建步骤，自带 Key（硅基流动 / Cerebras / O
 
 1. 下载 [Releases](../../releases) 里的 zip 解压，或直接 clone 本仓库
 2. Chrome 打开 `chrome://extensions`，开启右上角「开发者模式」，「加载已解压的扩展程序」选这个目录
-3. 首次安装会自动打开设置页：选服务商、粘贴对应的 API Key、点「测试」看到 ✓ 就行
+3. 首次安装会自动打开设置页：粘贴任意一家的 API Key（自动识别服务商），点「测试」看到 ✓ 就行
 
 安装时 Chrome 会提示「读取和更改您在所有网站上的数据」——那是为了在每个网页右侧显示浮标。X / Reddit 之外的页面在你点「翻译此页」之前**不读取、不发送任何内容**。
 
-## 三家服务商：选哪个
+## 服务商：选哪个
 
 | | 硅基流动（默认） | Cerebras | OpenRouter |
 |---|---|---|---|
@@ -44,9 +44,18 @@ Chrome 扩展，MV3，无构建步骤，自带 Key（硅基流动 / Cerebras / O
 
 <p align="center"><img src="docs/speed.png" width="640" alt="6 条推文翻完要多久：Cerebras 0.53s，硅基流动 1.3s，OpenRouter 1.5s，Gemini 3.8 Flash 2.7s，旧默认 Qwen3.5-35B 经常超时"></p>
 
+表里三家是实测过的。其余服务商的默认模型取自各家 2026-09 的官方文档（快、便宜、关掉思考），没有逐一实测速度；换用后点「测试」看一眼延迟和译文。
+
 > 数字是 2026-09 从日本家宽实测（同一批 6 条推文，各 6–12 轮，思考全部关闭）。为什么不是 Gemini 3.8 Flash / GPT / DeepSeek？Gemini 3 强制思考、首字节 1.6 秒且译文不如 Qwen；OpenRouter 每多一跳约 +1 秒；Groq / SambaNova 上的 gpt-oss、DeepSeek 要么强制思考要么中文一般。硅基流动上旧默认的 `Qwen3.5-35B-A3B` 约 30% 请求无响应，已自动迁移到 3.6。完整对比见下文。
 
 <p align="center"><img src="docs/options.png" width="560" alt="设置页：服务商切换、Key、模型、显示方式、站点、浮标"></p>
+
+### Key 自动识别怎么做的
+
+- **看格式**：`csk-` 是 Cerebras，`gsk_` 是 Groq，`sk-or-` 是 OpenRouter，`sk-ant-` 是 Claude，`AIza` 是 Gemini，`32位十六进制.16位` 是智谱，UUID 是火山方舟……有独特格式的直接认出。
+- **Key 只发给发它的那家公司**：`sk-` + 32 位十六进制既可能是 DeepSeek 也可能是阿里云百炼，这种格式撞车的情况会让你点一下选，**不会拿你的 Key 去别家试**。
+- **国内 / 国际站自动判断**：同一家公司的国内站和国际站账号不通用（硅基流动、百炼、Kimi、智谱 / Z.ai、MiniMax），就在这家公司的两个站点各请求一次免费的 `/models`，哪个认这个 Key 就是哪个区，顺便拿到模型列表挑默认模型。
+- 认不出的格式会提示手动选服务商；「其他（OpenAI 兼容）」可以填任意接口地址。
 
 ## 翻译是怎么做的
 
@@ -56,7 +65,7 @@ Chrome 扩展，MV3，无构建步骤，自带 Key（硅基流动 / Cerebras / O
 - **异常批次自动恢复**：模型偶尔返回数量不对或格式损坏时，自动把这一批拆成单条并发重试；最终结果覆盖可能提前显示的不完整片段。
 - **卡死与繁忙自愈**：每个请求两道看门狗——8 秒内没有首字节、或流式返回中途 15 秒没有新内容，立刻断开重连（硅基流动网关偶尔接受连接后不回任何数据，以前要干等 40 秒）；HTTP / 流内 429/502/503/504 和网络错误退避重试，遵守服务端 Retry-After；单次翻译连同重试最多 40 秒。页面侧对超时、繁忙等瞬时错误 3 秒、6 秒后自动重试两次。所有网页合计最多同时 3 个请求。
 - **不和 X 自带的 Grok 翻译打架**：推文旁边有「翻译自 英语 · 显示原文」时这条推文完全交给 X。
-- **关思考三种写法**：硅基流动 `enable_thinking:false`，Cerebras `reasoning_effort:"none"`，OpenRouter `reasoning:{enabled:false}`（Gemini 3 只接受 `effort:"minimal"`，gpt-oss 最低 `low`）。服务商表在 `background.js` 的 `PROVIDERS`，再加一家只需加一行和 `manifest.json` 的 `host_permissions`。
+- **按各家要求关思考**：`enable_thinking:false`（硅基流动、百炼）、`reasoning_effort:"none"`（Cerebras、OpenAI、Grok、Groq、Mistral，gpt-oss 最低 `low`）、`thinking:{type:"disabled"}`（DeepSeek、Kimi、智谱、豆包、MiniMax——DeepSeek 和豆包默认开着思考）、OpenRouter 的 `reasoning` 对象；Gemini 的接口遇到不认识的字段直接 400，所以什么都不发。Kimi、OpenAI、Claude 不接受自定义 temperature，就不发。个别接口不认 `stream_options` 时自动去掉重试。服务商表在 `providers.js`，再加一家只需加一行和 `manifest.json` 的 `host_permissions`。
 - **本地缓存**：`chrome.storage.local` LRU 2000 条，刷新页面不重复扣费；后台进程内常驻内存、改动后 0.8 秒写回。
 - **侧边浮标**：X / Reddit 已经自动翻译，不显示；其他网页上是透明玻璃，浅色页配深色、深色页配浅色，按页面自己的背景色判断并实时跟随主题切换；按住可沿右边缘上下拖到任意高度，位置记在本机、所有网页共用；设置里可关。
 
@@ -98,6 +107,8 @@ node test/translate.test.js                               # 语言识别 + 模�
 node test/sw.load.test.js                                 # 后台实际请求链：多脚本加载、排队/并发、流式、缓存、错误
 # 启动下方本地服务器后，安装了 playwright 的环境可运行：
 node test/browser.acceptance.js                          # 浏览器模拟验收（不调用真实 API）
+node test/providers.test.js                               # Key 识别只发给对应公司、国内/国际站判断、各家请求体、stream_options 回退
+node test/frames.extension.js                            # 加载真实扩展：跨域 / srcdoc / 后加载 iframe 随侧边标签一起翻译、计数（模型调用在后台被替换）
 node test/stream-timeout.test.js                         # 流式返回卡住时正确超时
 node test/stream.test.js                                 # SSE 尾帧、UTF-8 分块、JSON 兼容及服务错误
 node test/retry.test.js                                  # 503 有限重试及 Retry-After

@@ -71,15 +71,16 @@ const sse = texts => new Response(`data: ${JSON.stringify({ choices: [{ delta: {
   assert.equal(mem.tstats.day, day, "今日 turns over at local midnight");
   const ownKey = "tstats_" + mem.installId;
   assert.ok(sync[ownKey]?.total.n > 0, "this device's usage is mirrored to sync");
+  assert.ok(Date.now() - sync[ownKey].ts < 60000, "the synced copy says when it was written");
   const b = (n, cost) => ({ n, in: n * 10, out: n * 5, cost });
-  sync.tstats_otherMac = { day, today: b(5, 0.5), month: day.slice(0, 7), mon: b(50, 5), total: b(500, 50) };
+  sync.tstats_otherMac = { day, today: b(5, 0.5), month: day.slice(0, 7), mon: b(50, 5), total: b(500, 50), ts: 1234 };
   sync.tstats_oldMac = { day: "2020-01-01", today: b(7, 0.7), month: "2020-01", mon: b(70, 7), total: b(3, 0.3) };
   sync[ownKey] = { ...mem.tstats, total: b(99999, 999) };   // stale own copy: must not be counted on top of local
   mem.stats = { calls: 2, replies: 16, input_tokens: 3000, output_tokens: 200, cost: 0.01 };
   sync.stats_otherMac = { calls: 1, replies: 8, input_tokens: 1500, output_tokens: 100, cost: 0.005 };
   sync["stats_" + mem.installId] = { calls: 999, replies: 999, input_tokens: 0, output_tokens: 0, cost: 9 };
   const merged = await new Promise(resolve => listener({ type: "usage" }, {}, resolve));
-  assert.deepEqual({ ...merged.devices }, { tstats: 3, stats: 2 });
+  assert.deepEqual({ ...merged.devices, others: [...merged.devices.others].sort() }, { tstats: 3, stats: 2, others: [0, 1234] }, "other devices' last sync (0: written before 0.9)");
   assert.equal(merged.tstats.today.n, mem.tstats.today.n + 5, "stale days on other devices don't count as today");
   assert.equal(merged.tstats.mon.n, mem.tstats.mon.n + 50);
   assert.equal(merged.tstats.total.n, mem.tstats.total.n + 500 + 3);
@@ -184,7 +185,7 @@ const sse = texts => new Response(`data: ${JSON.stringify({ choices: [{ delta: {
 
   // The throttled mirror catches up with the last batch.
   await new Promise(r => setTimeout(r, 10500));
-  assert.deepEqual(sync[ownKey], mem.tstats);
-  assert.deepEqual(sync["stats_" + mem.installId], mem.stats);
+  const { ts: t1, ...mirroredTr } = sync[ownKey], { ts: t2, ...mirroredF } = sync["stats_" + mem.installId];
+  assert.deepEqual(mirroredTr, mem.tstats); assert.deepEqual(mirroredF, mem.stats); assert.ok(t1 && t2, "stamped with the write time");
   console.log("PASS throttled sync mirror ends equal to local usage");
 })().catch(e => { console.error(e); process.exitCode = 1; });

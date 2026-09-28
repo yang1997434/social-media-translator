@@ -8,7 +8,8 @@
 
 **发送了什么、发给谁**
 
-- **翻译**：在 X / Reddit 上浏览时，或在其他网页点击「翻译此页」之后，扩展把页面上需要翻译的文本段落发送到你在设置中选择的翻译服务：硅基流动（api.siliconflow.cn）、Cerebras（api.cerebras.ai）或 OpenRouter（openrouter.ai）。链接、@用户名、图片等不发送，用占位符代替。
+- **翻译**：在 X / Reddit 上浏览时，或在其他网页点击「翻译此页」之后，扩展把页面上需要翻译的文本段落发送到你在设置中选择的翻译服务商（例如硅基流动、DeepSeek、阿里云百炼、OpenAI、Google Gemini 等，或你自己填写的 OpenAI 兼容接口地址）。链接、@用户名、图片等不发送，用占位符代替。
+- **API Key 自动识别**：粘贴 Key 时，扩展先在本地根据 Key 的格式判断它属于哪家服务商；只有在确定了服务商之后，才会把 Key 发给该服务商自己的服务器（它的国内站和国际站）请求一次模型列表，用来确认账号所在区域。Key 不会被发送给任何其他服务商；格式无法区分时由你手动选择。
 - **评论过滤（可选）**：只有当你填写了 TypeSafe jev Key 时，扩展才会把 X 帖子详情页上的原帖和回复的文本、作者显示名，以及你亲手标记过的示例（各最多 10 条）发送到 TypeSafe（api.typesafe.ai）进行判定。不填 Key 时只使用本地规则，不发送任何内容。
 - 这些服务商如何处理收到的数据，以它们各自的隐私政策为准。
 
@@ -31,7 +32,8 @@
 
 **What is sent, and where**
 
-- **Translation**: on X / Reddit, or on any other page after you click "Translate this page", the text paragraphs to be translated are sent to the translation service you selected: SiliconFlow (api.siliconflow.cn), Cerebras (api.cerebras.ai) or OpenRouter (openrouter.ai). Links, @handles and images are replaced by placeholders and not sent.
+- **Translation**: on X / Reddit, or on any other page after you click "Translate this page", the text paragraphs to be translated are sent to the translation provider you selected (for example SiliconFlow, DeepSeek, Alibaba Cloud Bailian, OpenAI, Google Gemini, or an OpenAI-compatible endpoint URL you entered yourself). Links, @handles and images are replaced by placeholders and not sent.
+- **API key detection**: when you paste a key, the extension first works out locally, from the key's format, which provider issued it. Only once the provider is known is the key sent to that provider's own servers (its China and global hosts) to list models once and find the region of your account. A key is never sent to any other provider; when the format fits several providers, you choose.
 - **Reply filter (optional)**: only if you enter a TypeSafe jev key, the text and display names of the post and its replies on an X post page, plus up to 10 examples you marked yourself, are sent to TypeSafe (api.typesafe.ai) for scoring. Without a key only local rules run and nothing is sent.
 - Each provider's own privacy policy governs how it handles what it receives.
 

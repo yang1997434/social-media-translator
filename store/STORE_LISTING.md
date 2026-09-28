@@ -1,9 +1,20 @@
-# Chrome Web Store 上架材料（Social Media Translator 0.8.0）
+# Chrome Web Store 上架材料（Social Media Translator 0.9.0）
 
-上传包：`dist/x-reply-filter-0.8.0.zip`（`./build.sh` 生成，打包时会扫描密钥；包里只有扩展本身的代码和图标，不含任何 API Key）。
+上传包：`dist/x-reply-filter-0.9.0.zip`（`./build.sh` 生成，打包时会扫描密钥；包里只有扩展本身的代码和图标，不含任何 API Key）。
 填写时可以打开 `store/listing.html`，每一段都有「复制」按钮。
 
-## 你本人要做的（账号和付款我不能代办）
+## 更新到 0.9.0（已上架后的版本更新）
+
+上传包：`dist/x-reply-filter-0.9.0.zip`。开发者后台 → 选中 Social Media Translator → 「文件包」→「上传新文件包」。然后：
+
+- **商品详情**：「详细说明」换成下面 2 · 商品详情里的新文字（服务商那两行变了）；截图 4 换成新的 `store/screenshot-4-providers.png`
+- **隐私权规范**：「主机权限」理由换成下面的新文字（新增了各家服务商的 API 域名）；其余不变
+- 隐私政策网址不变，但 GitHub 上的 `PRIVACY.md` 要先推送最新版（写了 Key 自动识别只发给对应服务商）
+- 最后点「提交审核」
+
+本版改动：粘贴 API Key 自动识别服务商（20 多家 + 任意 OpenAI 兼容接口）；claude.ai artifact 等 iframe 里的内容也能翻译；X 长文章、Reddit「管理社区」简介自动翻译；原地替换不再挤成竖排、不再截断限高的文字框；多台电脑用量合计显示在弹窗上。
+
+## 首次上架时你本人要做的（账号和付款我不能代办）
 
 1. 打开 https://chrome.google.com/webstore/devconsole ，用你的 Google 账号登录（账号需要开启两步验证）
 2. 首次使用：接受开发者协议，支付 **US$5 一次性注册费**
@@ -13,7 +24,7 @@
 
 ### 1 · 上传
 
-「新增项目」→ 上传 `dist/x-reply-filter-0.8.0.zip`。名称和简短说明从 zip 里的 manifest 读取，不用填。
+「新增项目」→ 上传 `dist/x-reply-filter-0.9.0.zip`。名称和简短说明从 zip 里的 manifest 读取，不用填。
 
 ### 2 · 商品详情（Store listing）
 
@@ -28,11 +39,11 @@
 ■ 滚到哪翻到哪：提前预取、流式返回，哪条先好先显示
 ■ 不做无用功：已经是中文的不翻；X 自带 Grok 翻译过的推文交给 X；纯链接、纯表情、数字不发请求；翻过的内容本地缓存，不重复花钱
 ■ 任意网页：X / Reddit 以外的网页，点右侧浮标或工具栏图标，一键翻译 / 还原整页
-■ 自选服务商：硅基流动、Cerebras、OpenRouter 三选一，用你自己的 API Key，费用直接付给服务商
+■ 自选服务商：粘贴任意一家的 API Key 自动识别（硅基流动、DeepSeek、阿里云百炼、Kimi、智谱、豆包、OpenAI、Gemini、Claude 等 20 多家，也可填任意 OpenAI 兼容接口），费用直接付给服务商
 ■ 花费透明：弹窗显示今日、本月、累计的段数和金额；同一 Chrome 账号下的多台电脑自动合计
 ■ 评论过滤（可选）：折叠 X 评论区的推广、互动饵、跑题和 AI 套话；本地规则免费，填自己的 TypeSafe Key 可开启 AI 判定
 
-使用前需要自备 API Key：安装后设置页会自动打开，选服务商、粘贴 Key、点「测试」看到 ✓ 就可以用了。
+使用前需要自备 API Key：安装后设置页会自动打开，粘贴 Key（自动识别服务商）、点「测试」看到 ✓ 就可以用了。
 
 隐私：开发者不运营任何服务器，不收集任何数据。文本只发给你自己选择的服务商，API Key 只存在你的浏览器里。
 开源（MIT）：github.com/yang1997434/social-media-translator
@@ -53,11 +64,11 @@ Read X (Twitter) and Reddit in Chinese. Foreign-language posts and comments are 
 • As you scroll: prefetched and streamed, each post appears as soon as it is ready
 • No wasted calls: text already in Chinese, posts X translated with Grok, bare links, emoji and numbers are skipped; translations are cached locally
 • Any page: outside X / Reddit, click the side tab or the toolbar icon to translate or restore the whole page
-• Bring your own key: SiliconFlow, Cerebras or OpenRouter; you pay the provider directly
+• Bring your own key: paste a key from any of 20+ providers (SiliconFlow, DeepSeek, Alibaba Bailian, Kimi, Zhipu, OpenAI, Gemini, Claude, Groq, OpenRouter…) and the provider is recognized; any OpenAI-compatible endpoint works too. You pay the provider directly
 • Cost at a glance: today / this month / total, summed across your devices on the same Chrome account
 • Optional reply filter: folds promo, engagement bait, off-topic and AI-filler replies on X; local rules are free, AI scoring uses your own TypeSafe key
 
-Requires your own API key: the settings page opens after install. Pick a provider, paste the key, click Test.
+Requires your own API key: the settings page opens after install. Paste the key (the provider is recognized), click Test.
 Privacy: the developer runs no servers and collects no data. Text goes only to the provider you choose; keys stay in your browser.
 Open source (MIT): github.com/yang1997434/social-media-translator
 ```
@@ -92,7 +103,7 @@ Injects the translator into the current tab when the user clicks "Translate this
   - 主机权限（Host permission）
 
 ```
-API hosts (api.siliconflow.cn, api.cerebras.ai, openrouter.ai, api.typesafe.ai): the extension calls only the provider the user selected, with the user's own API key; no other server is contacted. Content scripts: on x.com, twitter.com and reddit.com posts and comments are translated automatically. On other http/https pages the content script only shows a small side tab at the right edge; the page is not read and nothing is sent until the user clicks it.
+API hosts (the translation providers listed in host_permissions, and api.typesafe.ai): the extension calls only the provider the user selected, with the user's own API key; a pasted key is sent only to the provider its format identifies (its China / global hosts) to list models; no other server is contacted. Content scripts: on x.com, twitter.com and reddit.com posts and comments are translated automatically. On other http/https pages the content script only shows a small side tab at the right edge; the page is not read and nothing is sent until the user clicks it.
 ```
 
 - **远程代码**：选「否，我没有使用远程代码」（所有 JS 都在包内）

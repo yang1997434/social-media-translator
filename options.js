@@ -23,13 +23,27 @@ async function saveTr(patch) {
   await chrome.storage.sync.set({ tr });
   toast();
 }
-const provider = () => ({ baseUrl: P().baseUrl, apiKey: $("tr_apiKey").value.trim(), model: $("tr_model").value.trim(), thinking: P().thinking });
+// The provider row as llm.js wants it (thinking switch, temperature rule, extra headers). The key is the one stored for this
+// provider, never a just-pasted one whose owner isn't settled: that one must not reach another company's host.
+const provider = () => ({ ...P(), baseUrl: tr.provider === "custom" ? $("tr_base").value.trim() : P().baseUrl, apiKey: tr.keys?.[tr.provider] || "", model: $("tr_model").value.trim() });
+// What is typed in the key field but not yet stored for the current provider.
+const pendingKey = () => { const k = $("tr_apiKey").value.trim(); return k !== (tr.keys?.[tr.provider] || "") ? k : ""; };
+
+// The provider list, grouped: 国内厂商 / 海外厂商 / 其他 (the custom OpenAI-compatible endpoint).
+function buildProviders() {
+  const groups = { cn: "国内厂商", intl: "海外厂商", other: "其他" };
+  $("tr_provider").innerHTML = Object.entries(groups).map(([g, label]) => {
+    const opts = Object.entries(PROVIDERS).filter(([, p]) => (p.group || "other") === g).map(([id, p]) => `<option value="${esc(id)}">${esc(p.name)}</option>`).join("");
+    return opts ? `<optgroup label="${label}">${opts}</optgroup>` : "";
+  }).join("");
+}
 
 function renderTr() {
   $("tr_enabled").checked = tr.enabled !== false;
-  $("tr_provider").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === tr.provider));
-  $("tr_apiKey").value = tr.keys?.[tr.provider] || ""; $("tr_apiKey").placeholder = P().keyHint;
-  $("tr_keyUrl").href = P().keyUrl;
+  $("tr_provider").value = tr.provider;
+  $("tr_apiKey").value = tr.keys?.[tr.provider] || "";
+  $("tr_keyUrl").href = P().keyUrl || "#"; $("tr_keyUrl").hidden = !P().keyUrl;
+  $("tr_baseRow").hidden = tr.provider !== "custom"; $("tr_base").value = tr.customBase || "";
   $("tr_model").value = curModel();
   $("tr_mode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === tr.mode));
   for (const s of ["x", "reddit"]) { const cb = $("tr_site_" + s); cb.checked = tr.sites?.[s] !== false; setChip(cb); }
@@ -40,12 +54,54 @@ function renderTr() {
 const loadModels = debounce(async () => {
   const p = provider();
   $("tr_models").innerHTML = "";
-  if (!p.apiKey) return;
+  if (!p.apiKey || !p.baseUrl) return;
   const r = await chrome.runtime.sendMessage({ type: "trModels", provider: p }).catch(() => null);
-  if (r?.models) $("tr_models").innerHTML = r.models.map(m => `<option value="${esc(m)}">`).join("");
+  if (r?.models) setModels(r.models);
 }, 400);
+const setModels = models => { $("tr_models").innerHTML = models.map(m => `<option value="${esc(m)}">`).join(""); };
+
+// ---- which provider a pasted key belongs to ----
+// Resolves true once the key is stored for a provider; false while the user still has to say whose it is.
+function setDetect(cls, html = "") { const d = $("tr_detect"); d.className = "detect " + cls; d.innerHTML = html; }
+let detectSeq = 0;
+async function onKey() {
+  const key = $("tr_apiKey").value.trim();
+  if (key === (tr.keys?.[tr.provider] || "")) return;
+  // Cleared, or typed for the custom endpoint the user chose: stored as is. Too short to be a key yet: wait.
+  if (!key || tr.provider === "custom") { await saveTr({ keys: { [tr.provider]: key } }); loadModels(); return; }
+  if (key.length >= 16) detect(key);
+}
+async function detect(key, company) {
+  const seq = ++detectSeq;
+  setDetect("", "识别中…");
+  const r = await chrome.runtime.sendMessage({ type: "trDetect", key, company }).catch(e => ({ error: e.message }));
+  if (seq !== detectSeq || key !== $("tr_apiKey").value.trim()) return false;   // the field changed meanwhile
+  if (r?.choices) {
+    // The shape fits several companies: the key is not sent anywhere until the user says whose it is.
+    setDetect("", `这个 Key 可能来自<span class="pick">${r.choices.map(c => `<button type="button" data-c="${esc(c.company)}">${esc(c.name)}</button>`).join("")}</span>`);
+    $("tr_detect").querySelectorAll("button").forEach(b => b.onclick = () => detect(key, b.dataset.c));
+    return false;
+  }
+  if (!r?.provider) {
+    // Not stored under whatever happens to be selected: picking a provider below carries the key over.
+    setDetect("warn", "没认出这个 Key 的格式：在下面选一下它属于哪家服务商；列表里没有就选「其他（OpenAI 兼容）」填接口地址");
+    return false;
+  }
+  const id = r.provider, switched = id !== tr.provider;
+  await saveTr({ provider: id, keys: { [id]: key }, models: { [id]: tr.models?.[id] || r.model || PROVIDERS[id].model }, ...(switched ? { priceIn: null, priceOut: null } : {}) });
+  renderTr(); $("tr_result").className = "result";
+  if (r.models) setModels(r.models); else loadModels();
+  applyKnownPrice(curModel()); renderTrFoot();
+  const name = esc(PROVIDERS[id].name);
+  if (r.error === "rejected") setDetect("bad", `是${name}的 Key，但被拒绝了：${esc(r.detail || "")}。检查一下是否复制完整`);
+  else if (r.unverified) setDetect("warn", `按格式识别为${name}，暂时没能连上验证（${esc(r.unverified)}），可以点「测试」`);
+  else setDetect("ok", `✓ ${name}${switched ? "，已切换" : ""} · ${r.models ? r.models.length + " 个可用模型" : ""}`);
+  return r.error !== "rejected";
+}
 
 async function testTr() {
+  const typed = pendingKey();   // pasted and Test clicked before detection ran: settle whose key it is first
+  if (typed) { if (tr.provider === "custom") await saveTr({ keys: { custom: typed } }); else if (!(await detect(typed))) return; }
   const p = provider();
   if (!p.apiKey) return showResult(false, "先填 API Key");
   if (!p.model) return showResult(false, "先填模型名");
@@ -58,12 +114,17 @@ async function testTr() {
 
 function bindTr() {
   $("tr_enabled").onchange = e => saveTr({ enabled: e.target.checked });
-  $("tr_provider").querySelectorAll("button").forEach(b => b.onclick = async () => {
-    if (b.dataset.v === tr.provider) return;
-    await saveTr({ provider: b.dataset.v, priceIn: null, priceOut: null });
+  $("tr_provider").onchange = async e => {
+    const id = e.target.value;
+    if (id === tr.provider) return;
+    const typed = pendingKey();   // a key pasted before picking its provider belongs to the one just picked
+    detectSeq++; setDetect("");
+    await saveTr({ provider: id, priceIn: null, priceOut: null, ...(typed ? { keys: { [id]: typed } } : {}) });
     renderTr(); $("tr_result").className = "result"; loadModels(); applyKnownPrice(curModel()); renderTrFoot();
-  });
-  $("tr_apiKey").oninput = debounce(() => { saveTr({ keys: { [tr.provider]: $("tr_apiKey").value.trim() } }); loadModels(); }, 500);
+  };
+  const keyChanged = debounce(onKey, 600);
+  $("tr_apiKey").oninput = () => { detectSeq++; setDetect(""); keyChanged(); };   // the old verdict is about the old key
+  $("tr_base").oninput = debounce(() => { saveTr({ customBase: $("tr_base").value.trim() }); loadModels(); }, 600);
   const saveModel = async () => { const m = $("tr_model").value.trim(); await saveTr({ models: { [tr.provider]: m } }); applyKnownPrice(m); };
   $("tr_model").onchange = saveModel;
   $("tr_model").oninput = debounce(saveModel, 600);
@@ -78,13 +139,19 @@ function bindTr() {
 const price = () => { const p = (Number(tr.priceIn) || Number(tr.priceOut)) ? [Number(tr.priceIn) || 0, Number(tr.priceOut) || 0] : P().prices[curModel()] || [0, 0]; return { pin: p[0], pout: p[1] }; };
 const cost = b => { if (typeof b.cost === "number") return b.cost; const { pin, pout } = price(); return (b.in * pin + b.out * pout) / 1e6; };
 
+const ago = ts => { if (!ts) return "较早"; const m = Math.round((Date.now() - ts) / 60000); return m < 1 ? "刚刚" : m < 60 ? `${m} 分钟前` : m < 1440 ? `${Math.round(m / 60)} 小时前` : `${Math.round(m / 1440)} 天前`; };
 async function renderTrFoot() {
   const { tstats, devices } = await chrome.runtime.sendMessage({ type: "usage" }).catch(() => null) || {};   // every device on this Chrome account
   const zero = { n: 0, in: 0, out: 0 };
   const t = tstats?.today || zero, tot = tstats?.total || zero;
   const { pin, pout } = price();
   const line = (k, b) => `${k} ${fmt(b.n)} 段 · ${fmt(b.in + b.out)} tokens${pin || pout || typeof b.cost === "number" ? ` · ¥${cost(b).toFixed(3)}` : ""}`;
-  $("tr_foot").textContent = `${line("今日", t)}　${line("累计", tot)}${devices?.tstats > 1 ? `　${devices.tstats} 台设备合计` : ""}`;
+  $("tr_foot").textContent = `${line("今日", t)}　${line("累计", tot)}`;
+  // Whether other computers are being counted, and how fresh their numbers are.
+  const others = devices?.others || [];
+  $("tr_sync").textContent = others.length
+    ? `${others.length + 1} 台设备合计：另${others.length > 1 ? ` ${others.length} 台分别` : "一台"} ${others.map(ago).join("、")}更新`
+    : "只统计到本机。多台电脑合计需要：登录同一个 Chrome 账号、同步里开启「扩展程序」、装的是同一个版本（商店版和本地加载的测试版互不相通）";
   $("tr_priceIn").value = pin ? +pin.toFixed(2) : ""; $("tr_priceOut").value = pout ? +pout.toFixed(2) : "";
 }
 // Known model → clear any typed override so the list price applies; unknown → keep whatever the user typed.
@@ -135,6 +202,7 @@ async function renderFFoot() {
 async function init() {
   const { defaults = {}, providers } = await chrome.runtime.sendMessage({ type: "trDefaults" }).catch(() => ({})) || {};
   PROVIDERS = providers || {};
+  buildProviders();
   if (!providers) showResult(false, "扩展后台还是旧版本：请到 chrome://extensions 点「重新加载」，再打开设置页");
   const { tr: saved } = await chrome.storage.sync.get({ tr: {} });
   tr = { ...defaults, ...saved, sites: { ...defaults.sites, ...(saved.sites || {}) }, keys: { ...(saved.keys || {}) }, models: { ...(saved.models || {}) } };

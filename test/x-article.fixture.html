@@ -1,0 +1,20 @@
+<!doctype html><html data-xrf-site="x"><head><meta charset="utf-8"><title>xrf X article fixture</title><link rel="stylesheet" href="/translator.css">
+<style>body{font:17px/1.6 -apple-system,system-ui,sans-serif;max-width:600px;margin:20px auto;color:#0f1419}[data-testid=twitter-article-title]{font-size:34px;font-weight:800;line-height:1.2}.bold{font-weight:700}pre{background:#eee}</style></head>
+<body><script src="/test/mock-chrome.js"></script>
+<!-- x.com/<user>/article/<id>: the read view is a read-only Draft.js editor (markup per the longform-* classes X ships). -->
+<article data-testid="tweet"><div data-testid="twitterArticleReadView">
+<div data-testid="twitter-article-title">Claude Projects: How to set up a Project before you start working</div>
+<div data-testid="twitterArticleRichTextView"><div data-testid="longformRichTextComponent"><div class="DraftEditor-root"><div class="DraftEditor-editorContainer"><div class="public-DraftEditor-content" contenteditable="false" role="textbox"><div data-contents="true">
+<div class="longform-unstyled" data-block="true" data-offset-key="a-0-0"><div class="public-DraftStyleDefault-block public-DraftStyleDefault-ltr" data-offset-key="a-0-0"><span data-offset-key="a-0-0"><span data-text="true">A Claude Project is one ongoing conversation with a coordinator agent.</span></span></div></div>
+<div class="longform-unstyled" data-block="true" data-offset-key="b-0-0"><div class="public-DraftStyleDefault-block public-DraftStyleDefault-ltr" data-offset-key="b-0-0"><span data-offset-key="b-0-0"><span data-text="true">Once you have access, you'll see </span></span><span class="bold" data-offset-key="b-0-1"><span data-text="true">Projects</span></span><span data-offset-key="b-0-2"><span data-text="true"> in the left sidebar.</span></span></div></div>
+<h2 class="longform-header-two" data-block="true" data-offset-key="c-0-0"><div class="public-DraftStyleDefault-block public-DraftStyleDefault-ltr" data-offset-key="c-0-0"><span data-offset-key="c-0-0"><span data-text="true">Set up the environment</span></span></div></h2>
+<ul class="public-DraftStyleDefault-ul"><li class="longform-unordered-list-item public-DraftStyleDefault-unorderedListItem" data-block="true" data-offset-key="d-0-0"><div class="public-DraftStyleDefault-block public-DraftStyleDefault-ltr" data-offset-key="d-0-0"><span data-offset-key="d-0-0"><span data-text="true">Connect the tools the threads will need.</span></span></div></li></ul>
+<blockquote class="longform-blockquote" data-block="true" data-offset-key="e-0-0"><div class="public-DraftStyleDefault-block public-DraftStyleDefault-ltr" data-offset-key="e-0-0"><span data-offset-key="e-0-0"><span data-text="true">Threads should never stop to ask for things they should already have.</span></span></div></blockquote>
+<pre class="public-DraftStyleDefault-pre"><div class="longform-code-block" data-block="true" data-offset-key="f-0-0"><div class="public-DraftStyleDefault-block public-DraftStyleDefault-ltr" data-offset-key="f-0-0"><span data-offset-key="f-0-0"><span data-text="true">claude project create --name demo</span></span></div></div></pre>
+<div class="longform-unstyled" data-block="true" data-offset-key="g-0-0"><div class="public-DraftStyleDefault-block public-DraftStyleDefault-ltr" data-offset-key="g-0-0"><span data-offset-key="g-0-0"><br data-text="true"></span></div></div>
+</div></div></div></div></div></div>
+</div></article>
+<!-- The article composer is the same Draft.js markup, but editable: never touched. -->
+<div id="composer" class="public-DraftEditor-content" contenteditable="true"><div data-contents="true"><div class="longform-unstyled" data-block="true"><div class="public-DraftStyleDefault-block"><span><span data-text="true">A draft I am still writing in English.</span></span></div></div></div></div>
+<script src="/lang.js"></script><script src="/translator.js"></script>
+</body></html>

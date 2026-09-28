@@ -9,12 +9,19 @@
   // when the popup's 翻译此页 button injects this script and sends trTogglePage.
   const SITE = (host === "localhost" && document.documentElement.dataset.xrfSite)   // fixtures only
     || (/(^|\.)(x\.com|twitter\.com)$/.test(host) ? "x" : /(^|\.)reddit\.com$/.test(host) ? "reddit" : "generic");
-  const AUTO = SITE !== "generic";
+  // The script also runs in every iframe (claude.ai artifacts, embedded docs live in cross-origin frames). A child frame
+  // never starts on its own and has no side tab: it follows the top frame's page toggle and reports its counts up.
+  const TOP = window === window.top;
+  const AUTO = TOP && SITE !== "generic";
   const SELECTOR = {
-    x: '[data-testid="tweetText"], [data-testid="UserDescription"], [data-testid="trend"] span',   // trend rows: only the leaf span with the name survives the innermost-only filter
+    x: ['[data-testid="tweetText"]', '[data-testid="UserDescription"]', '[data-testid="trend"] span',   // trend rows: only the leaf span with the name survives the innermost-only filter
+      // Articles (x.com/<user>/article/<id>): the title and each Draft.js block; code blocks stay as written.
+      '[data-testid="twitter-article-title"]', ".longform-unstyled", ".longform-header-one", ".longform-header-two", ".longform-header-three",
+      ".longform-blockquote", ".longform-ordered-list-item", ".longform-unordered-list-item"].join(", "),
     // recent-posts (右栏「近期帖子」) is a shadow host, but its list is slotted light DOM: take the leaf text nodes inside it.
     reddit: ['h1[slot="title"]', 'a[slot="title"]', '[slot="text-body"]', 'shreddit-post-text-body', '[slot="text-body"] p', '[slot="text-body"] li', '[slot="comment"] p', '[slot="comment"] li',
-      'recent-posts [slot="posts"] :is(a, span, h1, h2, h3, p, div)', "a.title", ".usertext-body p", ".usertext-body li"].join(", "),
+      'recent-posts [slot="posts"] :is(a, span, h1, h2, h3, p, div)', ".community--description",   // 管理社区 list (/user/<me>/communities)
+      "a.title", ".usertext-body p", ".usertext-body li"].join(", "),
     generic: "p, h1, h2, h3, h4, h5, h6, li, blockquote, dd, dt, figcaption, td, th, summary, div",
   }[SITE];
   const BLOCKS = "p, div, ul, ol, li, dd, dt, figcaption, td, th, summary, table, section, article, h1, h2, h3, h4, h5, h6, blockquote, pre, form, nav, header, footer";
@@ -50,10 +57,14 @@
   // ---- extraction: text with [[n]] placeholders for links / mentions / emoji images ----
   function extract(el) {
     const atoms = [];
+    // Source line breaks are real only where the element shows them (X's pre-wrap tweets). Elsewhere they are HTML
+    // formatting, and sending them makes the translation show blank lines the page never had. <br> always breaks.
+    const cs = getComputedStyle(el);
+    const keep = /^(pre|pre-wrap|pre-line|break-spaces|preserve|preserve-breaks)$/.test(cs.whiteSpaceCollapse || cs.whiteSpace);
     let text = "";
     const walk = node => {
       for (const n of node.childNodes) {
-        if (n.nodeType === 3) { text += n.nodeValue; continue; }
+        if (n.nodeType === 3) { text += keep ? n.nodeValue : n.nodeValue.replace(/[ \t\n\r\f]+/g, " "); continue; }
         if (n.nodeType !== 1 || n.matches(OURS)) continue;
         if (n.tagName === "BR") { text += "\n"; continue; }
         if (n.matches(ATOM)) { text += `[[${atoms.length}]]`; atoms.push(n); continue; }
@@ -61,13 +72,14 @@
       }
     };
     walk(el);
-    return { text: text.replace(/[ \t]+\n/g, "\n").trim(), atoms };
+    text = text.replace(/[ \t]+\n/g, "\n");
+    return { text: (keep ? text : text.replace(/\n[ \t]+/g, "\n")).trim(), atoms };
   }
 
   function collect() {
     const out = [];
     for (const el of document.querySelectorAll(SELECTOR)) {
-      if (el.dataset.xrfTr || el.closest(OURS)) continue;
+      if (el.dataset.xrfTr || el.closest(OURS) || el.isContentEditable) continue;   // never inside an editor (article composer, reply box)
       if (SITE === "generic") {
         if (el.closest(SKIP_INSIDE)) continue;
         if (el.querySelector(BLOCKS)) continue;                    // only leaf blocks: a div that merely wraps other blocks has no text of its own
@@ -104,20 +116,45 @@
     return node;
   }
 
+  // In-place mode hides the original's bare text with font-size:0, which also zeroes the element's own em/ch/lh
+  // lengths: a `max-width: 34ch` lede becomes 0px wide (one character per line), `margin: 1em` paragraphs lose their
+  // spacing. A length that went to exactly 0 is pinned to what it was. Generic pages only: X / Reddit's elements don't
+  // size themselves in em, and the read costs a layout per paragraph on their long feeds.
+  const FONT_RELATIVE = ["max-width", "min-width", "max-height", "min-height", "padding-top", "padding-right", "padding-bottom", "padding-left",
+    "margin-top", "margin-right", "margin-bottom", "margin-left", "text-indent", "letter-spacing", "word-spacing"];
+  const pins = new WeakMap();   // el -> [[property, previous inline value, previous priority]]
+  function pin(el, cs, was) {
+    const saved = [];
+    FONT_RELATIVE.forEach((p, i) => {
+      if (was[i] === "0px" || cs.getPropertyValue(p) !== "0px") return;
+      saved.push([p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
+      el.style.setProperty(p, was[i], "important");
+    });
+    if (saved.length) pins.set(el, saved);
+  }
+  function unpin(el) {
+    for (const [p, v, prio] of pins.get(el) || []) v ? el.style.setProperty(p, v, prio) : el.style.removeProperty(p);
+    pins.delete(el);
+  }
+
   function render(item, translated) {
     const { el, atoms } = item;
     clearOurs(el);
     el.classList.remove("xrf-tr-loading");
     const node = build(translated, atoms);
     if (cfg.mode === "replace") {
+      el.classList.remove("xrf-replaced"); unpin(el);   // a re-render (final result over a streamed preview) measures the original again
       const cs = getComputedStyle(el);
       node.style.fontSize = cs.fontSize;
       node.style.lineHeight = cs.lineHeight;
-      if (el.tagName === "LI") el.style.setProperty("--xrf-fs", cs.fontSize);   // ::marker sizes off the li itself, keep the bullet visible
+      // ::marker / ::before / ::after size off the element itself: keep bullets and icons visible.
+      el.style.setProperty("--xrf-fs", cs.fontSize); el.style.setProperty("--xrf-lh", cs.lineHeight);
+      const was = SITE === "generic" ? FONT_RELATIVE.map(p => cs.getPropertyValue(p)) : null;
       const toggle = document.createElement("span");
       toggle.className = "xrf-tr-toggle"; toggle.textContent = "原文"; toggle.title = "查看原文 / 译文";
       toggle.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); el.classList.toggle("xrf-show-orig"); toggle.textContent = el.classList.contains("xrf-show-orig") ? "译文" : "原文"; });
       el.classList.add("xrf-replaced");
+      if (was) pin(el, cs, was);
       el.append(node, toggle);
     } else {
       node.classList.add("xrf-tr-below");
@@ -155,7 +192,7 @@
   function reset(el) {
     activeItems.delete(el);
     clearOurs(el); el.classList.remove("xrf-replaced", "xrf-show-orig", "xrf-tr-loading");
-    el.style.removeProperty("--xrf-fs"); delete el.dataset.xrfTr;
+    el.style.removeProperty("--xrf-fs"); el.style.removeProperty("--xrf-lh"); unpin(el); delete el.dataset.xrfTr;
   }
   const current = it => enabled && it.generation === generation && it.el.isConnected && activeItems.get(it.el) === it;
 
@@ -300,7 +337,9 @@
     enabled = true;
     stats.translated = 0; stats.failed = 0; stats.lastError = "";
     detectTheme(); watchTheme();
-    io = new IntersectionObserver(onIntersect, { rootMargin: "600px 0px" });   // ~two tweets ahead: translated before they scroll in
+    // ~two tweets ahead: translated before they scroll in. A cross-origin frame's implicit root ignores rootMargin, so
+    // there the frame's own document is the root.
+    io = new IntersectionObserver(onIntersect, { root: TOP ? null : document, rootMargin: "600px 0px" });
     mo = new MutationObserver(onMutations);
     mo.observe(document.documentElement, { childList: true, characterData: true, subtree: true });
     // Route changes (Reddit sidebar, X tabs) as a second trigger in case the swap happened outside what we observed.
@@ -316,9 +355,24 @@
     scanTimer = null; routeTimer = null;
     generation++;
     io?.disconnect(); mo?.disconnect(); io = mo = null;
-    queue.length = 0; pending.clear(); watchdogs.clear();
+    queue.length = 0; pending.clear(); watchdogs.clear(); frameStats.clear();
     document.querySelectorAll("[data-xrf-tr]").forEach(reset);
     updateFab();
+  }
+
+  // ---- child frames: counts flow up to the top frame's side tab and popup ----
+  const frameStats = new Map();   // top frame only: child frameId -> its latest counts
+  const pendingCount = () => queue.filter(current).length + [...pending.values()].flat().filter(it => current(it) && it.status === "waiting").length;
+  const ownStats = () => ({ enabled, translated: stats.translated, failed: stats.failed, lastError: stats.lastError, pending: pendingCount(), busy: enabled && (inflight > 0 || queue.length > 0) });
+  function pageStats() {
+    const t = { ...ownStats(), site: SITE };
+    for (const s of frameStats.values()) if (s.enabled) { t.translated += s.translated; t.failed += s.failed; t.pending += s.pending; t.busy ||= s.busy; t.lastError ||= s.lastError; }
+    return t;
+  }
+  let reportTimer = null;
+  function reportStats() {
+    if (reportTimer) return;
+    reportTimer = setTimeout(() => { reportTimer = null; if (alive()) chrome.runtime.sendMessage({ type: "trFrameStats", stats: ownStats() }).catch(() => {}); }, 250);
   }
 
   // ---- side tab: a logo peeking from the right edge of every page but X / Reddit; hover slides it out, click translates / restores ----
@@ -375,49 +429,56 @@
   }
   addEventListener("resize", () => placeFab(fabY));   // once: ensureFab runs on every settings change
   function updateFab() {
+    if (!TOP) return reportStats();   // the side tab lives in the top frame
     if (!fab) return;
-    const busy = enabled && (inflight > 0 || queue.length > 0);
-    fab.classList.toggle("on", enabled); fab.classList.toggle("busy", busy);
-    fab.querySelector(".xrf-fab-label").textContent = enabled ? (busy ? `翻译中 · ${stats.translated}` : `还原此页 · ${stats.translated} 段`) : "翻译此页";
+    const { busy, translated } = pageStats();
+    fab.classList.toggle("on", enabled); fab.classList.toggle("busy", enabled && busy);
+    fab.querySelector(".xrf-fab-label").textContent = enabled ? (busy ? `翻译中 · ${translated}` : `还原此页 · ${translated} 段`) : "翻译此页";
   }
   // Same toggle for the popup button and the side tab: restores when running, otherwise starts (and flips the global
   // switch back on if it was off). No key yet → open the options page.
   async function togglePage() {
-    if (enabled) { stop(); return { enabled: false }; }
+    if (enabled) { stop(); toggleFrames(); return { enabled: false }; }
     const configured = await applyConfig();
     if (configured === false) { chrome.runtime.sendMessage({ type: "openOptions" }).catch(() => {}); return { enabled: false, configured: false }; }
     if (configured) {
       const { tr = {} } = await chrome.storage.sync.get({ tr: {} });
       if (tr.enabled === false) await chrome.storage.sync.set({ tr: { ...tr, enabled: true } });
-      start();
+      start(); toggleFrames();
     }
     return { enabled, configured };
   }
+  const toggleFrames = () => { if (alive()) chrome.runtime.sendMessage({ type: "trFrames", on: enabled }).catch(() => {}); };
 
-  const applyConfig = guard(async function applyConfigImpl() {
+  // join: a child frame told to follow the top frame's page toggle.
+  const applyConfig = guard(async function applyConfigImpl(join = false) {
     const c = await chrome.runtime.sendMessage({ type: "trConfig" });
     if (!c) return false;
     const modeChanged = c.mode !== cfg.mode;
     cfg = { mode: c.mode, concurrency: c.concurrency, batch: c.batch };
-    const want = c.configured && c.enabled && (AUTO ? c.sites?.[SITE] !== false : enabled);
+    const want = c.configured && c.enabled && (AUTO ? c.sites?.[SITE] !== false : enabled || join);
     if (want && !enabled) start();
     else if (!want && enabled) stop();
     else if (want && modeChanged) { stop(); start(); }   // re-render from cache in the new mode
-    ensureFab(!AUTO && c.fab !== false);   // X / Reddit translate on their own: no side tab there
+    ensureFab(TOP && !AUTO && c.fab !== false);   // X / Reddit translate on their own: no side tab there
     return c.configured;
   });
 
   chrome.runtime.onMessage.addListener((msg, _s, sendResponse) => {
-    if (msg.type === "getTrStats") sendResponse({ enabled, site: SITE, translated: stats.translated, failed: stats.failed, lastError: stats.lastError,
-      pending: queue.filter(current).length + [...pending.values()].flat().filter(it => current(it) && it.status === "waiting").length });
-    else if (msg.type === "trTogglePage") { togglePage().then(sendResponse); return true; }
-    else if (msg.type === "trPartial") {
+    if (msg.type === "trPartial") {
       watchdogs.get(msg.reqId)?.();
       const item = pending.get(msg.reqId)?.[msg.index];
       if (enabled && item) settle(item, msg.text);
     }
     else if (msg.type === "trProgress") watchdogs.get(msg.reqId)?.();
+    else if (!TOP) { if (msg.type === "trFrames") msg.on ? applyConfig(true) : enabled && stop(); }
+    else if (msg.type === "getTrStats") sendResponse(pageStats());
+    else if (msg.type === "trTogglePage") { togglePage().then(sendResponse); return true; }
+    else if (msg.type === "trFrameOn") sendResponse({ on: enabled && !AUTO });
+    else if (msg.type === "trFrameStats") { frameStats.set(msg.frameId, msg.stats); updateFab(); }
   });
-  chrome.storage.onChanged.addListener((ch, area) => { if (area === "sync" && ch.tr) applyConfig(); });
-  applyConfig();
+  chrome.storage.onChanged.addListener((ch, area) => { if (area === "sync" && ch.tr && (TOP || enabled)) applyConfig(); });
+  if (TOP) applyConfig();
+  // A frame that loads while the page is already translated (late iframe, SPA route) joins in.
+  else chrome.runtime.sendMessage({ type: "trFrameHello" }).then(r => { if (r?.on) applyConfig(true); }).catch(() => {});
 })();

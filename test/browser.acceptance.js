@@ -195,14 +195,50 @@ const base = "http://localhost:8766";
       console.log(`PASS ${site}: Traditional, Arabic, Thai, Hindi, Hebrew, Korean, short/mixed text; Simplified skipped`);
     }
     await page.addInitScript(() => { window.slowFirst = location.search.includes("slow") ? 4000 : 0; });
+    // Layout survives in-place replacement: lengths in ch/em on the element itself, px line-heights in a fixed 3-line box,
+    // pseudo-element bullets, HTML source line breaks, and the hover pill.
+    await page.goto(base + "/test/layout.fixture.html");
+    const boxes = () => page.evaluate(() => Object.fromEntries(["title", "lede", "p1", "li1", "desc", "one"].map(id => {
+      const el = document.getElementById(id), cs = getComputedStyle(el);
+      return [id, { w: Math.round(el.getBoundingClientRect().width), h: Math.round(el.getBoundingClientRect().height), mb: cs.marginBottom, pl: cs.paddingLeft }]; })));
+    const orig = await boxes();
+    const bullet = await page.evaluate(() => getComputedStyle(document.getElementById("li1"), "::before").fontSize);
+    await message({ type: "trTogglePage" });
+    await page.waitForFunction(() => document.querySelectorAll(".xrf-tr").length === 7 && !document.querySelector(".xrf-tr-loading"));
+    const now = await boxes();
+    assert.equal(now.lede.w, orig.lede.w, "max-width: 34ch keeps its width (was 0: one character per line)");
+    for (const id of ["title", "lede", "p1"]) assert.equal(now[id].mb, orig[id].mb, id + " keeps its em margin");
+    assert.equal(now.lede.pl, orig.lede.pl, "em padding kept");
+    assert.equal(now.one.h, 20, "a 20px line stays 20px");
+    assert.equal(now.desc.h % 20, 0, "the 3-line box holds whole 20px lines, none cut in half");
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("li1"), "::before").fontSize), bullet, "::before bullet keeps its size");
+    assert.ok(!(await page.evaluate(() => window.requests.some(r => r.texts.some(t => t.includes("\n"))))), "HTML source line breaks are not sent as line breaks");
+    await page.hover("#one");
+    assert.equal(await page.evaluate(() => document.getElementById("one").getBoundingClientRect().height), 20, "the 原文 pill does not grow the line on hover");
+    await message({ type: "trTogglePage" });
+    await page.waitForFunction(() => !document.querySelector(".xrf-tr"));
+    assert.deepEqual(await boxes(), orig, "restore puts every length back");
+    console.log("PASS layout: ch/em lengths, px line-heights, pseudo bullets, source line breaks, hover pill, clean restore");
+    await page.goto(base + "/test/x-article.fixture.html");
+    await done();
+    await page.waitForFunction(() => document.querySelectorAll(".xrf-tr").length === 6);
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll(".xrf-replaced")].map(el => el.dataset.testid || el.className.split(" ")[0])),
+      ["twitter-article-title", "longform-unstyled", "longform-unstyled", "longform-header-two", "longform-unordered-list-item", "longform-blockquote"]);
+    assert.equal(await page.locator("#composer .xrf-tr, .longform-code-block .xrf-tr").count(), 0, "composer and code block untouched");
+    assert.ok(!(await page.evaluate(() => window.requests.some(r => r.texts.some(t => /still writing|claude project create/.test(t))))), "never sent");
+    assert.equal(await page.locator(".longform-unstyled >> nth=1").evaluate(el => getComputedStyle(el.querySelector(".public-DraftStyleDefault-block")).display), "none", "original block hidden in place");
+    console.log("PASS X article: title, paragraphs, heading, list, quote; code block and composer untouched");
     await page.goto(base + "/test/reddit-preview.fixture.html");
     await done();
-    assert.equal(await page.locator(".xrf-tr").count(), 8);
+    await page.waitForFunction(() => document.querySelectorAll(".xrf-tr").length === 9);
     assert.equal(await page.locator('[slot="text-body"] .xrf-tr .xrf-tr').count(), 0);
+    // 管理社区: the English description is translated inside its link; the Chinese one, r/Name and the tooltip labels are not.
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("community-management-item [data-xrf-tr]")].map(el => el.classList[0] + ":" + el.dataset.xrfTr)), ["community--description:done", "community--description:skip"]);
+    assert.equal(await page.locator("community-management-item a .community--description .xrf-tr").count(), 1);
     // 近期帖子: the two titles are translated; r/Name, 1小时前 and 5 个赞同 are not even sent.
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("recent-posts .xrf-replaced")].map(el => el.firstChild.nodeValue)), ["How Are Others Handling Fable 5.1 Usage Limits?", "Working remotely abroad"]);
     assert.ok(!(await page.evaluate(() => window.requests.some(r => r.texts.some(t => /^r\/|赞同|小时前/.test(t))))));
-    console.log("PASS Reddit feed: titles, plain preview bodies, nested paragraphs and the recent-posts sidebar");
+    console.log("PASS Reddit feed: titles, plain preview bodies, nested paragraphs, the recent-posts sidebar, 管理社区 descriptions");
     await page.goto(base + "/test/translate.fixture.html?slow=1");
     await page.waitForSelector(".xrf-tr-loading");
     assert.equal(await page.locator(".xrf-tr-loading > span").first().evaluate(el => getComputedStyle(el).opacity), "1");
@@ -265,6 +301,36 @@ const base = "http://localhost:8766";
     assert.equal(await options.locator("section.card").count(), 2);
     assert.equal(await options.locator("#tr_apiKey").inputValue(), "sk-mock");
     console.log("PASS options UI: translation and filter settings load");
+    // Key detection: a distinctive key switches the provider; an ambiguous one asks whose it is; unknown ones say so.
+    assert.deepEqual(await options.locator("#tr_provider optgroup").evaluateAll(g => g.map(x => x.label)), ["国内厂商", "海外厂商", "其他"]);
+    assert.equal(await options.locator("#tr_provider").inputValue(), "siliconflow");
+    const saved = () => options.locator("body").evaluate(() => chrome.storage.sync.get({ tr: {} }).then(r => r.tr));
+    await options.locator("#tr_apiKey").fill("csk-" + "a1".repeat(24));
+    await options.locator("#tr_detect.ok").waitFor();
+    assert.equal(await options.locator("#tr_provider").inputValue(), "cerebras");
+    assert.match(await options.locator("#tr_detect").textContent(), /Cerebras，已切换/);
+    let t = await saved();
+    assert.deepEqual([t.provider, t.keys.cerebras, t.keys.siliconflow, t.models.cerebras], ["cerebras", "csk-" + "a1".repeat(24), "sk-mock", "qwen-3.8-27b"], "the other provider's key is kept");
+    await options.locator("#tr_apiKey").fill("sk-0123456789abcdef0123456789abcdef");
+    await options.locator("#tr_detect .pick button").first().waitFor();
+    assert.deepEqual(await options.locator("#tr_detect .pick button").allTextContents(), ["DeepSeek", "阿里云百炼"]);
+    assert.equal((await saved()).keys.deepseek, undefined, "not saved anywhere until the user says whose it is");
+    await options.locator("#tr_detect .pick button", { hasText: "阿里云百炼" }).click();
+    await options.locator("#tr_detect.ok").waitFor();
+    assert.equal(await options.locator("#tr_provider").inputValue(), "bailian_intl");
+    await options.locator("#tr_apiKey").fill("no-idea-what-this-is-123456");
+    await options.locator("#tr_detect.warn").waitFor();
+    assert.ok(!Object.values((await saved()).keys).includes("no-idea-what-this-is-123456"), "an unrecognised key is not stored under whatever is selected");
+    await options.locator("#tr_provider").selectOption("custom");
+    assert.equal(await options.locator("#tr_baseRow").isVisible(), true);
+    assert.equal((await saved()).keys.custom, "no-idea-what-this-is-123456", "picking a provider carries the pasted key over");
+    await options.locator("#tr_base").fill("https://llm.example.com/v1");
+    await options.locator("#tr_apiKey").fill("anything-goes-here");
+    await page.waitForTimeout(900);
+    t = await saved();
+    assert.deepEqual([t.provider, t.customBase, t.keys.custom], ["custom", "https://llm.example.com/v1", "anything-goes-here"]);
+    assert.equal(await options.locator("#tr_detect").textContent(), "", "a custom endpoint is never auto-detected");
+    console.log("PASS options UI: key detection switches provider, asks on ambiguous keys, custom endpoint row");
     for (const query of ["timeline=1", "thread=1", "timeline=1&keep=1"]) {
       await page.goto(base + "/test/fixture.html?" + query);
       const ad = page.locator('article').filter({ has: page.locator('a[href="/CrystalEngc7/status/200"]') });

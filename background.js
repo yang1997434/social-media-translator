@@ -357,6 +357,7 @@ const HANDLERS = {
   trTest: msg => trTest(msg.provider),
   trModels: msg => XRF_LLM.listModels(msg.provider).then(models => ({ models }), e => ({ error: e.message })),
   trDetect: msg => detectKey(msg.key, msg.company),
+  trCss: () => fetch(chrome.runtime.getURL("translator.css")).then(r => r.text()).then(css => ({ css })),   // for shadow roots
   trClearCache: () => clearCache().then(() => ({ ok: true })),
   jevTest: msg => jevTest(msg.apiKey),
 };

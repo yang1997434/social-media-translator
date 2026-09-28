@@ -1,18 +1,19 @@
-# Chrome Web Store 上架材料（Social Media Translator 0.9.0）
+# Chrome Web Store 上架材料（Social Media Translator 0.9.1）
 
-上传包：`dist/x-reply-filter-0.9.0.zip`（`./build.sh` 生成，打包时会扫描密钥；包里只有扩展本身的代码和图标，不含任何 API Key）。
+上传包：`dist/x-reply-filter-0.9.1.zip`（`./build.sh` 生成，打包时会扫描密钥；包里只有扩展本身的代码和图标，不含任何 API Key）。
 填写时可以打开 `store/listing.html`，每一段都有「复制」按钮。
 
-## 更新到 0.9.0（已上架后的版本更新）
+## 更新到 0.9.1（已上架后的版本更新）
 
-上传包：`dist/x-reply-filter-0.9.0.zip`。开发者后台 → 选中 Social Media Translator → 「文件包」→「上传新文件包」。然后：
+上传包：`dist/x-reply-filter-0.9.1.zip`。开发者后台 → 选中 Social Media Translator → 「文件包」→「上传新文件包」。然后：
 
+- 如果上一版还在「待审核」：先在这个扩展的页面点「取消审核」（Cancel review）回到草稿，才能换包
 - **商品详情**：「详细说明」换成下面 2 · 商品详情里的新文字（服务商那两行变了）；截图 4 换成新的 `store/screenshot-4-providers.png`
 - **隐私权规范**：「主机权限」理由换成下面的新文字（新增了各家服务商的 API 域名）；其余不变
 - 隐私政策网址不变，但 GitHub 上的 `PRIVACY.md` 要先推送最新版（写了 Key 自动识别只发给对应服务商）
 - 最后点「提交审核」
 
-本版改动：粘贴 API Key 自动识别服务商（20 多家 + 任意 OpenAI 兼容接口）；claude.ai artifact 等 iframe 里的内容也能翻译；X 长文章、Reddit「管理社区」简介自动翻译；原地替换不再挤成竖排、不再截断限高的文字框；多台电脑用量合计显示在弹窗上。
+本版改动：粘贴 API Key 自动识别服务商（20 多家 + 任意 OpenAI 兼容接口）；claude.ai artifact 等 iframe 里的内容也能翻译；X 长文章、Reddit「管理社区」简介自动翻译；原地替换不再挤成竖排、不再截断限高的文字框；多台电脑用量合计显示在弹窗上；Reddit 搜索结果和社区侧栏介绍也会翻译。
 
 ## 首次上架时你本人要做的（账号和付款我不能代办）
 
@@ -24,7 +25,7 @@
 
 ### 1 · 上传
 
-「新增项目」→ 上传 `dist/x-reply-filter-0.9.0.zip`。名称和简短说明从 zip 里的 manifest 读取，不用填。
+「新增项目」→ 上传 `dist/x-reply-filter-0.9.1.zip`。名称和简短说明从 zip 里的 manifest 读取，不用填。
 
 ### 2 · 商品详情（Store listing）
 

@@ -230,15 +230,27 @@ const base = "http://localhost:8766";
     console.log("PASS X article: title, paragraphs, heading, list, quote; code block and composer untouched");
     await page.goto(base + "/test/reddit-preview.fixture.html");
     await done();
-    await page.waitForFunction(() => document.querySelectorAll(".xrf-tr").length === 9);
+    await page.waitForFunction(() => document.querySelectorAll(".xrf-tr").length === 10);
+    // Community sidebar inside a shadow root that only appeared after the first scan.
+    const sidebar = () => page.evaluate(() => { const r = document.querySelector("shreddit-subreddit-header").shadowRoot;
+      return r && { tr: [...r.querySelectorAll(".xrf-tr")].map(n => n.parentElement.id), css: /xrf-replaced/.test(r.querySelector("style.xrf-css")?.textContent || ""),
+        titleFs: getComputedStyle(r.getElementById("title")).fontSize }; });
+    await page.waitForFunction(() => document.querySelector("shreddit-subreddit-header")?.shadowRoot?.querySelectorAll(".xrf-tr").length === 2);
+    assert.deepEqual(await sidebar(), { tr: ["title", "description"], css: true, titleFs: "0px" }, "shadow-root text translated in place with translator.css inside the root");
+    assert.equal(await page.locator('[data-testid="post-title-text"] .xrf-tr').count(), 1, "visible search title translated");
+    assert.equal(await page.locator("faceplate-screen-reader-content .xrf-tr").count(), 0, "screen-reader copy left alone");
+    assert.ok(!(await page.evaluate(() => window.requests.some(r => r.texts.some(t => /社区信息区域|每周访客数|显示更多内容|票|条评论/.test(t))))), "Chinese UI labels not sent");
+    // Lit re-renders the description (e.g. 显示更多内容): the new text is translated again.
+    await page.evaluate(() => { const d = document.querySelector("shreddit-subreddit-header").shadowRoot.getElementById("description"); [...d.childNodes].find(t => t.nodeType === 3 && /subreddit/.test(t.nodeValue)).nodeValue = "Longer description after show more."; });
+    await page.waitForFunction(() => { const d = document.querySelector("shreddit-subreddit-header").shadowRoot.getElementById("description"); return d.dataset.xrfTr === "done" && window.requests.some(r => r.texts.includes("Longer description after show more.")); });
     assert.equal(await page.locator('[slot="text-body"] .xrf-tr .xrf-tr').count(), 0);
     // 管理社区: the English description is translated inside its link; the Chinese one, r/Name and the tooltip labels are not.
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("community-management-item [data-xrf-tr]")].map(el => el.classList[0] + ":" + el.dataset.xrfTr)), ["community--description:done", "community--description:skip"]);
     assert.equal(await page.locator("community-management-item a .community--description .xrf-tr").count(), 1);
     // 近期帖子: the two titles are translated; r/Name, 1小时前 and 5 个赞同 are not even sent.
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("recent-posts .xrf-replaced")].map(el => el.firstChild.nodeValue)), ["How Are Others Handling Fable 5.1 Usage Limits?", "Working remotely abroad"]);
-    assert.ok(!(await page.evaluate(() => window.requests.some(r => r.texts.some(t => /^r\/|赞同|小时前/.test(t))))));
-    console.log("PASS Reddit feed: titles, plain preview bodies, nested paragraphs, the recent-posts sidebar, 管理社区 descriptions");
+    assert.ok(!(await page.evaluate(() => window.requests.some(r => r.texts.some(t => /^r\/[\w-]+$|赞同|小时前/.test(t))))));
+    console.log("PASS Reddit: feed titles and bodies, recent-posts, 管理社区, search results, community sidebar in a shadow root (late, re-rendered)");
     await page.goto(base + "/test/translate.fixture.html?slow=1");
     await page.waitForSelector(".xrf-tr-loading");
     assert.equal(await page.locator(".xrf-tr-loading > span").first().evaluate(el => getComputedStyle(el).opacity), "1");

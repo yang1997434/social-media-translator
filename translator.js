@@ -21,6 +21,7 @@
     // recent-posts (右栏「近期帖子」) is a shadow host, but its list is slotted light DOM: take the leaf text nodes inside it.
     reddit: ['h1[slot="title"]', 'a[slot="title"]', '[slot="text-body"]', 'shreddit-post-text-body', '[slot="text-body"] p', '[slot="text-body"] li', '[slot="comment"] p', '[slot="comment"] li',
       'recent-posts [slot="posts"] :is(a, span, h1, h2, h3, p, div)', ".community--description",   // 管理社区 list (/user/<me>/communities)
+      'a[data-testid="post-title-text"]',   // search results; the post-title link beside it only holds a screen-reader copy
       "a.title", ".usertext-body p", ".usertext-body li"].join(", "),
     generic: "p, h1, h2, h3, h4, h5, h6, li, blockquote, dd, dt, figcaption, td, th, summary, div",
   }[SITE];
@@ -29,6 +30,12 @@
   // Inline pieces we never send to the model: they become [[n]] placeholders and are put back verbatim.
   const ATOM = "a, img, code, video, button, kbd, svg, input, select, textarea, iframe";
   const OURS = ".xrf-tr, .xrf-tr-toggle";
+  const OWN = OURS + ", .xrf-fab, .xrf-css";   // everything we add to a page, for the mutation filter
+  // Open shadow roots whose text is the site's own content: Reddit's Lit components render the community sidebar (title,
+  // description) inside one. Page stylesheets don't reach in there, so each root gets translator.css as well.
+  const SHADOW = { reddit: [["shreddit-subreddit-header", "#title, #description"]] }[SITE] || [];
+  const MO_OPTS = { childList: true, characterData: true, subtree: true };
+  const roots = new Set();
   let scanTimer = null;
 
   let cfg = { mode: "replace", concurrency: 3, batch: 6 };
@@ -78,7 +85,7 @@
 
   function collect() {
     const out = [];
-    for (const el of document.querySelectorAll(SELECTOR)) {
+    for (const el of [...document.querySelectorAll(SELECTOR), ...shadowTargets()]) {
       if (el.dataset.xrfTr || el.closest(OURS) || el.isContentEditable) continue;   // never inside an editor (article composer, reply box)
       if (SITE === "generic") {
         if (el.closest(SKIP_INSIDE)) continue;
@@ -87,6 +94,30 @@
       out.push(el);
     }
     return out;
+  }
+
+  let shadowCss = null;
+  const waitedHosts = new WeakSet();
+  function shadowTargets() {
+    const out = [];
+    for (const [tag, sel] of SHADOW) for (const host of document.querySelectorAll(tag)) {
+      const root = host.shadowRoot;
+      if (!root) {   // not upgraded yet (content scripts can't see customElements.whenDefined): look again shortly
+        if (!waitedHosts.has(host)) { waitedHosts.add(host); setTimeout(scheduleScan, 1500); }
+        continue;
+      }
+      if (!roots.has(root)) { roots.add(root); mo?.observe(root, MO_OPTS); styleRoot(root); }
+      out.push(...root.querySelectorAll(sel));
+    }
+    return out;
+  }
+  function styleRoot(root) {
+    if (root.querySelector(":scope > style.xrf-css")) return;
+    const style = document.createElement("style");
+    style.className = "xrf-css";
+    root.appendChild(style);
+    // The worker reads the file: a content script can't fetch its own non-web-accessible resources.
+    (shadowCss ||= chrome.runtime.sendMessage({ type: "trCss" }).then(r => r?.css || "", () => "")).then(css => { style.textContent = css; });
   }
 
   // ---- rendering ----
@@ -293,8 +324,8 @@
     for (const m of muts) {
       const changed = m.type === "childList" ? [...m.addedNodes, ...m.removedNodes] : [];
       const target = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-      if (target?.closest?.(OURS + ", .xrf-fab")) continue;                                // inside our own nodes (toggle label, side tab)
-      if (changed.length && changed.every(n => n.nodeType === 1 && n.matches?.(OURS))) continue; // we added/removed our own nodes
+      if (target?.closest?.(OWN)) continue;                                                 // inside our own nodes (toggle label, side tab, shadow css)
+      if (changed.length && changed.every(n => n.nodeType === 1 && n.matches?.(OWN))) continue;  // we added/removed our own nodes
       const host = target?.closest?.("[data-xrf-tr]");
       // X sometimes reuses the same tweetText element and only changes its text node.
       // Invalidate every completed/skipped/in-flight result when its source changes.
@@ -341,7 +372,7 @@
     // there the frame's own document is the root.
     io = new IntersectionObserver(onIntersect, { root: TOP ? null : document, rootMargin: "600px 0px" });
     mo = new MutationObserver(onMutations);
-    mo.observe(document.documentElement, { childList: true, characterData: true, subtree: true });
+    mo.observe(document.documentElement, MO_OPTS);
     // Route changes (Reddit sidebar, X tabs) as a second trigger in case the swap happened outside what we observed.
     lastHref = location.href;
     routeTimer = setInterval(() => { if (!alive()) return teardown(); if (location.href !== lastHref) { lastHref = location.href; scheduleScan(); } }, 800);
@@ -357,6 +388,8 @@
     io?.disconnect(); mo?.disconnect(); io = mo = null;
     queue.length = 0; pending.clear(); watchdogs.clear(); frameStats.clear();
     document.querySelectorAll("[data-xrf-tr]").forEach(reset);
+    for (const root of roots) root.querySelectorAll("[data-xrf-tr]").forEach(reset);
+    roots.clear();   // a restart observes them again with its new MutationObserver
     updateFab();
   }
 

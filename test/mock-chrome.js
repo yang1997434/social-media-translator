@@ -53,6 +53,7 @@
     trClearCache: async () => ({ ok: true }),
     jevTest: async () => { await new Promise(r => setTimeout(r, 500)); return { ok: true, ms: 640, model: "jev-1.13.0", spam: 0.97, usage: { input_tokens: 310, output_tokens: 20 } }; },
     openOptions: async () => ({ ok: true }), count: async () => ({ ok: true }), trFrames: async () => ({ ok: true }),
+    trCss: async () => ({ css: await fetch("/translator.css").then(r => r.text()) }),
     translate: async msg => { await new Promise(r => setTimeout(r, 100 + Math.random() * 900)); return { translations: msg.texts.map(t => CANNED[t] || "（译）" + t) }; },
   };
   let onMessage = null;

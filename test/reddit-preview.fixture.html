@@ -8,4 +8,28 @@
 
 <!-- reddit.com/user/<me>/communities (管理社区), markup from a real page 2026-09-28 -->
 <community-management-app><ul><li role="listitem" class="community-management--list-item"><community-management-item community-id="t5_2r0ij" community-name="r/announcements" joined="" role="listitem"><a href="/r/announcements" class="community--link-wrapper"><span class="community--icon"></span><div class="community--text-container"><div class="community--title-container"><span class="community--title">r/announcements</span></div><div class="community--description" dir="auto">Official announcements from Reddit, Inc.</div></div></a><div class="community--trailing-container"><rpl-tooltip placement="bottom" appearance="inverted"><span slot="content"><span class="community--unfavorited-tooltip-label">收藏 r/announcements</span><span class="community--favorited-tooltip-label">取消收藏 r/announcements</span></span></rpl-tooltip></div></community-management-item></li><li role="listitem" class="community-management--list-item"><community-management-item community-id="t5_zh" community-name="r/China_irl" joined="" role="listitem"><a href="/r/China_irl" class="community--link-wrapper"><span class="community--icon"></span><div class="community--text-container"><div class="community--title-container"><span class="community--title">r/China_irl</span></div><div class="community--description" dir="auto">这是一个中文社区，不需要翻译。</div></div></a><div class="community--trailing-container"><rpl-tooltip placement="bottom" appearance="inverted"><span slot="content"><span class="community--unfavorited-tooltip-label">收藏 r/China_irl</span><span class="community--favorited-tooltip-label">取消收藏 r/China_irl</span></span></rpl-tooltip></div></community-management-item></li></ul></community-management-app>
+
+<!-- r/<sub>/search results, markup from a real page 2026-09-29: the post-title link is a transparent overlay holding only a
+     screen-reader copy; the visible title is post-title-text. -->
+<div data-testid="search-post-unit"><search-telemetry-tracker data-testid="search-sdui-post"><div actioned="">
+  <search-telemetry-tracker click-events="search/click/post"><h2 class="m-0"><a data-testid="post-title" href="/r/SideProject/comments/1tkqag4/x/" class="absolute inset-0" aria-label="I built a free website audit tool that combines SEO/AEO/GEO visibility with security analysis"><faceplate-screen-reader-content>I built a free website audit tool that combines SEO/AEO/GEO visibility with security analysis</faceplate-screen-reader-content></a></h2></search-telemetry-tracker>
+  <div data-testid="sdui-post-unit"><div><div class="post-credit-row"><span><a href="/r/SideProject/"><span>r/SideProject</span></a></span> · <span>4个月前</span></div></div>
+    <a data-testid="post-title-text" id="search-post-title-t3_1tkqag4" href="/r/SideProject/comments/1tkqag4/x/">I built a free website audit tool that combines SEO/AEO/GEO visibility with security analysis</a>
+    <div><span>2 票</span> · <span>1 条评论</span></div></div>
+</div></search-telemetry-tracker></div>
+<!-- Community sidebar: a Lit component rendering title + description inside its open shadow root. Defined late, like a
+     custom element that upgrades after the content script's first scan. -->
+<shreddit-subreddit-header name="SideProject" display-name="r/SideProject - A community for sharing side projects"></shreddit-subreddit-header>
+<script>
+setTimeout(() => customElements.define("shreddit-subreddit-header", class extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>#title{font-size:14px;font-weight:600}#description{font-size:14px;line-height:20px;color:#576f76}</style>
+      <div class="header"><h1 aria-label="社区信息区域"> <!--?lit$1$-->社区信息区域 </h1><div class="flex"><div> <!--?lit$1$--><div id="title"> <!--?lit$1$-->r/SideProject - A community for sharing side projects </div></div>
+      <!--?lit$1$--><div id="description"> <!--?lit$1$-->r/SideProject is a subreddit for sharing and receiving constructive feedback on side projects. </div>
+      <button id="show-more-btn"><span>显示更多内容</span></button></div>
+      <div data-testid="activity-indicators"><div><span><strong>32万</strong></span> <span>每周访客数</span></div></div></div>`;
+  }
+}), 700);
+</script>
 </body></html>
